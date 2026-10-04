@@ -118,19 +118,21 @@ function setup({ denied = false, stored = {}, realPdf = false } = {}) {
   let downloads = 0;
   let previews = 0;
   let generated = 0;
+  const windowListeners = {};
+  let draftWrites = 0;
   const context = {
     document, console, Date, Blob, URL, TextDecoder, location: { protocol: 'http:' },
     navigator: { pdfViewerEnabled: true },
     localStorage: {
       getItem(key) { if (denied) throw Error('Storage denied'); return storage.get(key) ?? null; },
-      setItem(key, value) { if (denied) throw Error('Storage denied'); storage.set(key, value); },
+      setItem(key, value) { if (denied) throw Error('Storage denied'); if (key === 'dae-enfermeria:v1') draftWrites++; storage.set(key, value); },
       removeItem(key) { if (denied) throw Error('Storage denied'); storage.delete(key); },
     },
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     Image: class {},
     setTimeout(fn) { timers.set(++timerId, fn); return timerId; },
     clearTimeout(id) { timers.delete(id); },
-    addEventListener() {}, scrollTo() {},
+    addEventListener(name, fn) { (windowListeners[name] ||= []).push(fn); }, scrollTo() {},
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     open: () => { previews++; return { location: {}, close() {} }; },
     DAE: {
@@ -168,6 +170,9 @@ function setup({ denied = false, stored = {}, realPdf = false } = {}) {
   document.dispatchEvent({ type: 'DOMContentLoaded' });
   return {
     context, elements, ids, fields, storage, timers, form,
+    get draftWrites() { return draftWrites; },
+    event(type) { (windowListeners[type] || []).forEach(fn => fn({ type, key: 'dae-enfermeria:v1' })); },
+    hidden() { context.document.visibilityState = 'hidden'; context.document.dispatchEvent({ type: 'visibilitychange' }); },
     get downloads() { return downloads; }, get previews() { return previews; }, get generated() { return generated; },
     flush() { const queued = [...timers.values()]; timers.clear(); queued.forEach(fn => fn()); },
     input(name, value) {
@@ -184,6 +189,100 @@ async function settleImport(env, confirm = true) {
   await new Promise(setImmediate);
   if (confirm) env.ids.stuConfirmImport.dispatchEvent({ type: 'click' });
 }
+
+const draftKey = 'dae-enfermeria:v1';
+const draft = (revision, data = { nombres: 'Fictional external' }) => JSON.stringify({ schema: 3, revision, writer: 'external-session', data });
+
+test('draft debounce, hidden flush, pagehide flush and unchanged state writes', () => {
+  const env = setup();
+  env.hidden(); env.event('pagehide'); assert.equal(env.draftWrites, 0);
+  env.input('nombres', 'Fictional first'); assert.equal(env.draftWrites, 0);
+  env.flush(); assert.equal(env.draftWrites, 1);
+  env.input('nombres', 'Fictional latest'); env.hidden();
+  assert.equal(JSON.parse(env.storage.get(draftKey)).data.nombres, 'Fictional latest');
+  env.input('nombres', 'Fictional pagehide'); env.event('pagehide');
+  assert.equal(JSON.parse(env.storage.get(draftKey)).data.nombres, 'Fictional pagehide');
+  const count = env.draftWrites; env.event('pagehide'); env.hidden(); env.flush();
+  env.blur('nombres'); env.flush(); assert.equal(env.draftWrites, count);
+});
+
+test('current and legacy drafts restore with explicit schema migration on next edit', () => {
+  for (const raw of [draft(4, { identificationType: 'ipe', identificationValue: '000123', nombres: 'Fictional' }),
+    JSON.stringify({ run: '12.345.678-5', nombres: 'Fictional' })]) {
+    const env = setup({ stored: { [draftKey]: raw } });
+    assert.equal(env.ids.nombres.value, 'Fictional');
+    env.input('curso', 'Demo'); env.flush();
+    const saved = JSON.parse(env.storage.get(draftKey));
+    assert.equal(saved.schema, 3); assert.ok(saved.revision > 0);
+    assert.equal(saved.data.nombres, 'Fictional');
+  }
+});
+
+test('corrupt, incompatible and unsafe drafts fail atomically without breaking startup', () => {
+  const bad = ['{', '[]', 'null', JSON.stringify({ schema: 99 }),
+    JSON.stringify({ schema: 2, nombres: ['unsafe'] }), JSON.stringify({ schema: 2, unknown: 'unsafe' }),
+    JSON.stringify({ schema: 2, run: '12.345.678-9', nombres: 'Must not restore' }),
+    draft(1, { identificationType: 'ipe', identificationValue: 'not-numeric' }),
+    draft(1, { fechaAcc: '2026-02-31' }), draft(1, { sexo: '3' }),
+    draft(1, { firma: 'data:image/svg+xml;base64,AAAA' }), draft(1, { nombres: 'x'.repeat(41) })];
+  for (const raw of bad) {
+    const env = setup({ stored: { [draftKey]: raw } });
+    assert.equal(env.ids.nombres.value, '');
+    assert.equal(env.ids.run.value, '');
+    assert.equal(env.storage.get(draftKey), raw); // No destructive cleanup or logging.
+    assert.ok(env.elements.some(el => el.textContent.includes('recuperar')));
+    env.input('nombres', 'Fictional replacement'); env.flush();
+    assert.equal(JSON.parse(env.storage.get(draftKey)).schema, 3);
+  }
+});
+
+test('external revisions pause autosave, ignore stale updates and require explicit load or keep', () => {
+  const env = setup(); env.input('nombres', 'Fictional local'); env.flush();
+  env.input('curso', 'Unsaved demo');
+  const external = draft(10); env.storage.set(draftKey, external); env.event('storage');
+  assert.equal(env.ids.draftConflict.hidden, false);
+  assert.equal(env.ids.nombres.value, 'Fictional local');
+  env.hidden(); env.flush(); assert.equal(env.storage.get(draftKey), external);
+  env.ids.draftLoad.dispatchEvent({ type: 'click' });
+  assert.equal(env.ids.nombres.value, 'Fictional external'); assert.equal(env.ids.curso.value, '');
+  env.storage.set(draftKey, draft(9)); env.event('storage'); assert.equal(env.ids.draftConflict.hidden, true);
+  env.input('nombres', 'Fictional kept'); env.storage.set(draftKey, draft(11)); env.event('storage');
+  env.ids.draftKeep.dispatchEvent({ type: 'click' });
+  assert.equal(JSON.parse(env.storage.get(draftKey)).data.nombres, 'Fictional kept');
+  assert.equal(JSON.parse(env.storage.get(draftKey)).revision, 12);
+});
+
+test('storage denial, external deletion, conflict erasure and translations remain usable', async () => {
+  const denied = setup({ denied: true }); denied.input('nombres', 'Fictional'); denied.hidden(); denied.event('pagehide');
+  assert.equal(denied.ids.nombres.value, 'Fictional');
+  const env = setup(); env.input('nombres', 'Fictional'); env.flush();
+  env.storage.delete(draftKey); env.event('storage'); assert.equal(env.ids.draftConflict.hidden, false);
+  env.ids.draftLoad.dispatchEvent({ type: 'click' }); assert.equal(env.ids.nombres.value, '');
+  env.storage.set(draftKey, draft(20)); env.event('storage');
+  for (const lang of ['es', 'en', 'ja']) {
+    env.context.I18N.apply(lang);
+    for (const key of ['No se pudo recuperar el borrador local.', 'Otro registro local cambió. Elija qué borrador conservar.', 'Conflicto de borradores', 'Conservar el trabajo de esta pestaña', 'Cargar el borrador guardado']) {
+      const translated = env.context.I18N.t(key); assert.ok(translated); if (lang !== 'es') assert.notEqual(translated, key);
+    }
+  }
+  const pending = env.context.review.clearLocalData(); env.ids.dialog.close('ok'); await pending;
+  env.hidden(); env.event('pagehide'); env.flush(); assert.equal(env.storage.has(draftKey), false);
+  assert.equal(env.ids.draftConflict.hidden, true);
+  env.input('nombres', 'Fictional restarted'); env.flush(); assert.equal(JSON.parse(env.storage.get(draftKey)).revision, 1);
+});
+
+test('pre-write checking catches missed events and equal revisions from another writer', () => {
+  const env = setup(); env.input('nombres', 'Fictional local'); env.flush();
+  const revision = JSON.parse(env.storage.get(draftKey)).revision;
+  env.input('curso', 'Unsaved'); const other = draft(revision);
+  env.storage.set(draftKey, other); env.event('pagehide');
+  assert.equal(env.storage.get(draftKey), other); assert.equal(env.ids.draftConflict.hidden, false);
+  env.storage.set(draftKey, draft(revision + 2)); // Another save before the choice.
+  env.ids.draftKeep.dispatchEvent({ type: 'click' });
+  assert.equal(env.ids.draftConflict.hidden, false); assert.equal(env.ids.nombres.value, 'Fictional local');
+  env.ids.draftKeep.dispatchEvent({ type: 'click' });
+  assert.equal(JSON.parse(env.storage.get(draftKey)).data.nombres, 'Fictional local');
+});
 
 test('application version is canonical and renders consistently in ES/EN/JA', () => {
   const env = setup();
@@ -283,7 +382,7 @@ test('invalid dates cannot be bypassed by PDF download or preview', async () => 
 
 test('clear confirmation cancellation preserves data; acceptance removes only application keys', async () => {
   const env = setup({ stored: {
-    'dae-enfermeria:v1': JSON.stringify({ schema: 2, nombres: 'Fictional', diagnostico: 'Synthetic', firma: 'data:image/png;base64,c3ludGhldGlj' }),
+    'dae-enfermeria:v1': JSON.stringify({ schema: 2, nombres: 'Fictional', diagnostico: 'Synthetic', firma: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+afo0AAAAASUVORK5CYII=' }),
     'dae-enfermeria:estudiantes:v1': JSON.stringify({ students: { synthetic: { nombres: 'Fictional' } } }),
     'dae-enfermeria:prefs': '{}', 'school-nursing-language': 'en', unrelated: 'keep',
   } });

@@ -39,7 +39,48 @@ legacy caches containing this scope's index.html. Unrelated caches are preserved
    hosting provider serving a coherent deployment. Retry after completing publication.
 5. Keep `/sw.js` revalidated (`_headers` already specifies no-cache).
 
-## Manual browser checks
+## Local draft recovery
+
+Drafts remain outside Cache Storage, under `dae-enfermeria:v1` in localStorage.
+Schema 3 uses `{ schema, revision, writer, data }`: a monotonically increasing
+integer revision within a draft history, a per-page random writer identifier, and
+an allowlisted string field map. No student or medical values enter metadata or
+logs. Storage denial leaves the form usable but cannot guarantee recovery.
+
+Normal edits use the existing 500 ms debounce. Hidden `visibilitychange` and
+`pagehide` synchronously attempt to flush changed state; unchanged forms are not
+written. These are best effort: browser/process termination or storage denial can
+still lose edits. No unload confirmation is installed.
+
+Recovery validates shape, limits, selections, RUN/IPE, calendar dates and bounded
+PNG signature representation/dimensions before applying any fields. Schema-less,
+schema 1 and schema 2 drafts migrate in memory; the legacy `run` maps only to RUN,
+and the former explicit `provisional` type maps to IPE. The next changed save
+writes schema 3. Missing optional fields remain blank and school names are preserved.
+Invalid/unsupported drafts are ignored atomically with a translated notification;
+the original storage value is retained until the user edits and replaces it.
+This includes incomplete or invalid identification values and invalid dates, so
+finish or clear invalid fields before relying on recovery. No invalid RUN becomes IPE.
+
+Storage events and a pre-write read detect another writer's revision. Equal
+revisions with different writers also require a choice. Autosave pauses rather
+than merging medical data, even when the receiving tab has no unsaved changes.
+Users can keep this tab's work (explicit replacement) or load the saved draft
+(replace all form fields). External deletion is also presented as a choice;
+unusable external data cannot be loaded. Clear-all cancels pending saves and resets
+the local conflict/revision state along with existing sensitive data.
+LocalStorage has no atomic compare-and-swap: simultaneous writes between the
+pre-write read and write cannot be completely prevented; storage notifications
+expose the resulting divergent drafts for explicit resolution.
+
+Manual draft checks: edit and immediately reload/close/hide the tab; reopen and
+check the last field and signature. In two tabs edit different fictional data,
+save one, verify the other pauses and both choice buttons work. Repeat after
+clear-all, with corrupt/unsupported JSON, denied storage and offline mode. Switch
+ES/EN/JA while the warning is visible; check mobile wrapping, keyboard focus and
+screen-reader announcements. Check Spanish PDF preview/download after recovery.
+
+## Offline and release checks
 
 - Use localhost or HTTPS. Load online, wait for installation, reload and confirm a
   service-worker controller. Inspect Cache Storage: one cache for the current scope

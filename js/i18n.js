@@ -167,6 +167,20 @@
     ['Versión {version}', 'Version {version}', 'バージョン {version}'],
   ];
   messages.forEach(([es, en, ja]) => { dictionaries.en[es] = en; dictionaries.ja[es] = ja; });
+  Object.assign(dictionaries.en, {
+    'No se pudo recuperar el borrador local.': 'The local draft could not be recovered. Your form remains available.',
+    'Otro registro local cambió. Elija qué borrador conservar.': 'The local draft changed in another tab. Choose which draft to keep.',
+    'Conflicto de borradores': 'Draft conflict',
+    'Conservar el trabajo de esta pestaña': 'Keep this tab’s work',
+    'Cargar el borrador guardado': 'Load the saved draft'
+  });
+  Object.assign(dictionaries.ja, {
+    'No se pudo recuperar el borrador local.': 'ローカルの下書きを復元できませんでした。フォームは引き続き使用できます。',
+    'Otro registro local cambió. Elija qué borrador conservar.': '別のタブで下書きが変更されました。どちらの下書きを保持するか選択してください。',
+    'Conflicto de borradores': '下書きの競合',
+    'Conservar el trabajo de esta pestaña': 'このタブの入力内容を保持',
+    'Cargar el borrador guardado': '保存された下書きを読み込む'
+  });
   let current = 'es';
   try { current = localStorage.getItem(STORAGE_KEY) || 'es'; } catch (_) { /* Use in-memory language. */ }
   if (!['es', 'en', 'ja'].includes(current)) current = 'es';

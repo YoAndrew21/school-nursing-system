@@ -2,6 +2,10 @@
    Declaración Individual de Accidente Escolar — estilos
    ========================================================= */
 
+.draft-notice { margin: 1rem; padding: 1rem; border: 1px solid var(--warn); border-radius: var(--radius-sm); background: var(--warn-soft); overflow-wrap: anywhere; }
+.draft-notice button { max-width: 100%; margin: .25rem; padding: .6rem; border: 1px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; white-space: normal; }
+.draft-notice button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
 :root {
   --bg: #eef3f6;
   --surface: #ffffff;

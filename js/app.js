@@ -24,7 +24,7 @@
 
   // Borradores guardados con una versión anterior (schema distinto) toman el
   // nombre actual del establecimiento al recuperarse
-  const DRAFT_SCHEMA = 2;
+  const DRAFT_SCHEMA = 3;
 
   // Datos que se conservan al comenzar un formulario nuevo
   const KEEP_ON_RESET = ['tipoEst', 'estNombre', 'estProvincia', 'estComuna', 'horario'];
@@ -189,21 +189,111 @@
   function renderSaveStatus() {
     saveText.textContent = tr(saveMessage, saveParams);
     saveStatus.title = tr(saveTitle);
+    const notice = $('#draftRecovery');
+    notice.hidden = !['No se pudo recuperar el borrador local.', 'Sin guardado local'].includes(saveMessage);
+    notice.textContent = notice.hidden ? '' : tr(saveMessage);
   }
 
+  const writer = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let revision = 0, baseline = '', seenRaw = null, pendingDraft = null;
+  const conflictBox = $('#draftConflict');
+  function renderConflict() { conflictBox.hidden = !pendingDraft; $('#draftLoad').disabled = !!pendingDraft?.invalid; }
+  const plain = value => value && typeof value === 'object' && !Array.isArray(value);
+  function decodeDraft(raw) {
+    if (typeof raw !== 'string' || raw.length > 3000000) throw Error('Invalid draft');
+    const stored = JSON.parse(raw);
+    if (!plain(stored) || ![undefined, 1, 2, DRAFT_SCHEMA].includes(stored.schema)) throw Error('Invalid schema');
+    const current = stored.schema === DRAFT_SCHEMA;
+    if (current && (Object.keys(stored).some(k => !['schema', 'revision', 'writer', 'data'].includes(k)) ||
+        !Number.isSafeInteger(stored.revision) || stored.revision < 1 ||
+        typeof stored.writer !== 'string' || !/^[a-z0-9-]{1,100}$/.test(stored.writer))) throw Error('Invalid revision');
+    const data = current ? stored.data : stored;
+    if (!plain(data)) throw Error('Invalid fields');
+    const fields = new Map([...form.elements].filter(el => el.name).map(el => [el.name, el]));
+    const clean = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (!current && key === 'schema') continue;
+      if (!fields.has(key) && !['run', 'firma'].includes(key)) throw Error('Unknown field');
+      const limit = key === 'firma' ? 2800000 : key === 'identificationValue' ? 30 : Number(fields.get(key)?.getAttribute('maxlength')) || 1024;
+      if (typeof value !== 'string' || value.length > limit || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)) throw Error('Invalid value');
+      clean[key] = value;
+    }
+    if (!clean.identificationType) clean.identificationType = 'run';
+    if (!current && clean.identificationType === 'provisional') clean.identificationType = 'ipe';
+    if (!['run', 'ipe'].includes(clean.identificationType)) throw Error('Invalid identity');
+    if (!('identificationValue' in clean)) clean.identificationValue = clean.run || '';
+    if (clean.identificationType === 'ipe') clean.identificationValue = clean.identificationValue.trim();
+    if (clean.identificationValue && !validIdentification(clean.identificationType, clean.identificationValue)) throw Error('Invalid identity');
+    if (clean.run && (clean.identificationType !== 'run' || !validRun(clean.run) || cleanRun(clean.run) !== cleanRun(clean.identificationValue))) throw Error('Invalid RUN');
+    for (const key of ['fechaNac', 'fechaAcc', 'fechaRegistro', 'fechaCierre']) {
+      if (clean[key] && !parseCalendarDate(clean[key])) throw Error('Invalid date');
+    }
+    if ((clean.fechaNac && clean.fechaNac > todayISO()) || (clean.fechaAcc && clean.fechaAcc > todayISO()) ||
+        (clean.fechaNac && clean.fechaAcc && clean.fechaNac > clean.fechaAcc)) throw Error('Invalid date order');
+    for (const key of ['sexo', 'tipoEst', 'tipoAcc', 'hosp', 'incap']) if (clean[key] && !['1', '2'].includes(clean[key])) throw Error('Invalid selection');
+    if (clean.tipoIncap && !/^[1-6]$/.test(clean.tipoIncap)) throw Error('Invalid selection');
+    if (clean.causaCierre && !/^[1-4]$/.test(clean.causaCierre)) throw Error('Invalid selection');
+    if (clean.horaAcc && !/^([01]\d|2[0-3]):[0-5]\d$/.test(clean.horaAcc)) throw Error('Invalid time');
+    for (const key of ['edad', 'codifCom', 'asisSS', 'asisEst', 'diasHosp', 'diasIncap']) if (clean[key] && !/^\d+$/.test(clean[key])) throw Error('Invalid digits');
+    // Only bounded PNG data URLs produced by the existing signature pad may be restored.
+    if (clean.firma && (!/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(clean.firma) || (clean.firma.length - 22) % 4)) throw Error('Invalid signature');
+    if (clean.firma) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const encoded = clean.firma.slice(22, 66), bytes = [];
+      for (let i = 0; i < encoded.length; i += 4) {
+        const n = encoded.slice(i, i + 4).split('').reduce((v, c) => v * 64 + Math.max(0, alphabet.indexOf(c)), 0);
+        bytes.push((n >>> 16) & 255, (n >>> 8) & 255, n & 255);
+      }
+      const uint32 = offset => bytes.slice(offset, offset + 4).reduce((v, b) => v * 256 + b, 0);
+      const width = uint32(16), height = uint32(20);
+      if (uint32(8) !== 13 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR' ||
+          !width || !height || width > 8192 || height > 8192 || width * height > 16000000) throw Error('Invalid signature dimensions');
+    }
+    return { data: clean, revision: current ? stored.revision : 0, writer: current ? stored.writer : '', raw };
+  }
   function loadSaved() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
+      seenRaw = localStorage.getItem(STORAGE_KEY);
+      if (!seenRaw) return null;
+      const draft = decodeDraft(seenRaw);
+      revision = draft.revision;
+      return draft.data;
+    } catch (_) {
+      saveMessage = seenRaw ? 'No se pudo recuperar el borrador local.' : 'Sin guardado local';
+      renderSaveStatus();
       return null;
     }
   }
+  function externalDraft(raw) {
+    if (raw === seenRaw || localDataCleared) return;
+    let draft;
+    try { draft = raw === null ? { data: null, revision: revision + 1, raw } : decodeDraft(raw); }
+    catch (_) { saveMessage = 'No se pudo recuperar el borrador local.'; renderSaveStatus(); return; }
+    if (raw !== null && (draft.revision < revision || draft.writer === writer)) { seenRaw = raw; return; }
+    if (pendingDraft && draft.revision < pendingDraft.revision) return;
+    pendingDraft = draft;
+    save.cancel();
+    saveStatus.classList.remove('is-saving');
+    saveMessage = 'Otro registro local cambió. Elija qué borrador conservar.';
+    renderSaveStatus(); renderConflict();
+  }
 
   const save = debounce(() => {
-    if (localDataCleared) return;
+    if (localDataCleared || pendingDraft || JSON.stringify(getData()) === baseline) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign(getData(), { schema: DRAFT_SCHEMA })));
+      const raw = localStorage.getItem(STORAGE_KEY);
+      externalDraft(raw);
+      if (pendingDraft) return;
+      // An unrecognized changed value must not be overwritten without a choice.
+      if (raw !== seenRaw) {
+        pendingDraft = { data: null, revision: revision + 1, raw, invalid: true };
+        saveMessage = 'Otro registro local cambió. Elija qué borrador conservar.';
+        saveStatus.classList.remove('is-saving'); renderSaveStatus(); renderConflict(); return;
+      }
+      const data = getData();
+      const next = JSON.stringify({ schema: DRAFT_SCHEMA, revision: revision + 1, writer, data });
+      localStorage.setItem(STORAGE_KEY, next);
+      revision++; seenRaw = next; baseline = JSON.stringify(data);
       const t = new Date();
       saveMessage = 'Guardado {time}';
       saveParams = { time: `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` };
@@ -217,12 +307,42 @@
   }, 500);
 
   function markDirty() {
-    if (localDataCleared) return;
+    if (localDataCleared || pendingDraft) return;
+    if (JSON.stringify(getData()) === baseline) {
+      save.cancel(); saveStatus.classList.remove('is-saving');
+      if (saveMessage === 'Guardando…') { saveMessage = 'Borrador local'; renderSaveStatus(); }
+      return;
+    }
     saveStatus.classList.add('is-saving');
     saveMessage = 'Guardando…';
     renderSaveStatus();
     save();
   }
+  function resolveDraft(keep) {
+    if (!pendingDraft || (!keep && pendingDraft.invalid)) return;
+    const draft = pendingDraft;
+    seenRaw = draft.raw; revision = Math.max(revision, draft.revision);
+    pendingDraft = null; renderConflict();
+    if (keep) { baseline = ''; save.flush(); }
+    else {
+      const empty = Object.fromEntries([...form.elements].filter(el => el.name).map(el => [el.name, '']));
+      setData(Object.assign(empty, { firma: '', identificationType: 'run' }, draft.data || {}));
+      $('#edad').value = computeAge($('#fechaNac').value, $('#fechaAcc').value);
+      baseline = JSON.stringify(getData()); touched.clear(); showAllErrors = false;
+      lookupKey = ''; lookupState = ''; renderRunLookup();
+      renderDerived(getData()); renderValidation(getData()); renderCircMeter.flush(); preview.schedule();
+      saveMessage = 'Borrador recuperado'; renderSaveStatus();
+    }
+  }
+  $('#draftKeep').addEventListener('click', () => resolveDraft(true));
+  $('#draftLoad').addEventListener('click', () => resolveDraft(false));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save.flush(); });
+  window.addEventListener('pagehide', () => save.flush());
+  window.addEventListener('storage', event => {
+    if (event.key === STORAGE_KEY || event.key === null) {
+      try { externalDraft('newValue' in event ? event.newValue : localStorage.getItem(STORAGE_KEY)); } catch (_) { saveMessage = 'Sin guardado local'; renderSaveStatus(); }
+    }
+  });
 
   /* ---------- validación y progreso ---------- */
 
@@ -882,6 +1002,7 @@
     // Cancel pending autosave before erasing; do not recreate the draft on focusout.
     localDataCleared = true;
     save.cancel();
+    pendingDraft = null; revision = 0; seenRaw = null; baseline = ''; renderConflict();
     let failed = false;
     for (const key of [STORAGE_KEY, PREFS_KEY, 'school-nursing-language']) {
       try { localStorage.removeItem(key); } catch (_) { failed = true; }
@@ -902,6 +1023,7 @@
     renderCircMeter.flush();
     renderRunLookup();
     preview.clear();
+    baseline = JSON.stringify(getData());
     saveStatus.classList.remove('is-saving');
     saveMessage = failed ? 'Sin guardado local' : 'Datos locales eliminados.';
     saveTitle = '';
@@ -1052,7 +1174,6 @@
 
     const saved = loadSaved();
     if (saved) {
-      if (!saved.estNombre || saved.schema !== DRAFT_SCHEMA) saved.estNombre = DEFAULTS.estNombre;
       setData(saved);
       if (Object.keys(saved).some((k) => /^(asis|diag|parteCuerpo|hosp|diasHosp|incap|diasIncap|tipoIncap|causaCierre|fechaCierre)/.test(k) && saved[k])) {
         $('#asisDetails').open = true;
@@ -1068,6 +1189,7 @@
     renderDerived(data);
     renderValidation(data);
     renderCircMeter.flush();
+    baseline = JSON.stringify(getData());
     // Un borrador recuperado no se sobrescribe con la base al salir del campo RUN
     lookupKey = validIdentification(data.identificationType, data.identificationValue) ? DAEStudents.identification.key(data.identificationType, data.identificationValue) : '';
     renderRunLookup();
