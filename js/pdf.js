@@ -62,6 +62,11 @@
     Object.keys(raw || {}).forEach((k) => {
       d[k] = k === 'firma' ? raw[k] : clean(raw[k]);
     });
+    // Use the existing identification field without changing its official RUN label.
+    // Legacy callers still supply only raw.run. Provisional values get no invented prefix.
+    if (raw.identificationType === 'run' || raw.identificationType === 'ipe') {
+      d.run = clean(raw.identificationValue ?? raw.run);
+    }
     const reg = parseDate(raw.fechaRegistro) || {};
     const acc = parseDate(raw.fechaAcc) || {};
     const nac = parseDate(raw.fechaNac) || {};

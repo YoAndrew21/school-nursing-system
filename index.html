@@ -166,10 +166,19 @@
               <p class="field-error"><span data-i18n="Ingrese los nombres.">Ingrese los nombres.</span></p>
             </div>
 
+            <div class="field">
+              <label for="identificationType"><span data-i18n="Tipo de identificación">Tipo de identificación</span></label>
+              <select id="identificationType" name="identificationType" required>
+                <option value="run" data-i18n="RUN chileno">RUN chileno</option>
+                <option value="ipe" data-i18n="IPE">IPE</option>
+              </select>
+            </div>
             <div class="field" data-required>
-              <label for="run"><span data-i18n="R.U.N. del alumno">R.U.N. del alumno</span> <span class="req" aria-hidden="true">*</span></label>
-              <input id="run" name="run" type="text" maxlength="12" placeholder="12.345.678-9" inputmode="text" autocapitalize="characters" spellcheck="false" required>
-              <p class="field-error"><span data-i18n="Ingrese un RUN válido (revise el dígito verificador).">Ingrese un RUN válido (revise el dígito verificador).</span></p>
+              <label for="run"><span id="identificationLabel">R.U.N. del alumno</span> <span class="req" aria-hidden="true">*</span></label>
+              <input id="run" name="identificationValue" type="text" maxlength="12" placeholder="12.345.678-9" inputmode="text" autocapitalize="characters" spellcheck="false" aria-describedby="identificationPolicy provisionalPdfNotice runLookup" required>
+              <p class="field-error"></p>
+              <p class="hint" id="identificationPolicy"></p>
+              <p class="hint" id="provisionalPdfNotice" hidden><span data-i18n="El PDF conserva el campo oficial «R.U.N. ALUMNO» y muestra allí el valor provisional sin cambiar la etiqueta. El espacio es limitado y puede abreviarlo. Revise el PDF y confirme su uso con la institución receptora.">El PDF conserva el campo oficial «R.U.N. ALUMNO» y muestra allí el valor provisional sin cambiar la etiqueta. El espacio es limitado y puede abreviarlo. Revise el PDF y confirme su uso con la institución receptora.</span></p>
               <p class="hint run-lookup" id="runLookup" aria-live="polite">
                 <span id="runLookupText"></span>
                 <button type="button" class="link-btn" data-action="students"><span data-i18n="Carga masiva">Carga masiva</span></button>
@@ -499,7 +508,7 @@
       <header class="stu-head">
         <div>
           <h2 id="stuTitle"><span data-i18n="Carga masiva de estudiantes">Carga masiva de estudiantes</span></h2>
-          <p class="card-desc"><span data-i18n="Cargue un Excel con los datos de los alumnos. Después, al ingresar el RUN en el formulario, los datos del estudiante se completan solos.">Cargue un Excel con los datos de los alumnos. Después, al ingresar el RUN en el formulario, los datos del estudiante se completan solos.</span></p>
+          <p class="card-desc"><span data-i18n="Cargue un archivo con los datos de los estudiantes. Seleccione el tipo e ingrese su RUN o identificación provisional para completar sus datos.">Cargue un archivo con los datos de los estudiantes. Seleccione el tipo e ingrese su RUN o identificación provisional para completar sus datos.</span></p>
         </div>
         <button type="button" class="btn btn-ghost btn-icon" id="stuClose" aria-label="Cerrar" data-i18n-aria-label="Cerrar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -511,7 +520,7 @@
           <span class="card-badge" aria-hidden="true">1</span>
           <div class="stu-step-body">
             <h3><span data-i18n="Descargue la plantilla">Descargue la plantilla</span></h3>
-            <p class="hint"><span data-i18n="Tabla con listas desplegables para Sexo, Curso, Horario, Comuna y Provincia. La hoja «Instrucciones» explica cada columna.">Tabla con listas desplegables para Sexo, Curso, Horario, Comuna y Provincia. La hoja «Instrucciones» explica cada columna.</span></p>
+            <p class="hint"><span data-i18n="La plantilla incluye Identificación y Tipo de identificación (RUN o IPE). Las planillas antiguas con columna RUN siguen siendo compatibles. Un tipo vacío se interpreta como RUN; use texto para conservar ceros iniciales.">La plantilla incluye Identificación y Tipo de identificación (RUN o IPE). Las planillas antiguas con columna RUN siguen siendo compatibles. Un tipo vacío se interpreta como RUN; use texto para conservar ceros iniciales.</span></p>
             <a class="btn btn-secondary btn-small" href="plantillas/Plantilla_Estudiantes.xlsx" download="Plantilla_Estudiantes.xlsx">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
               <span data-i18n="Descargar plantilla">Descargar plantilla</span>
@@ -534,7 +543,7 @@
         </li>
       </ol>
 
-      <p class="stu-empty" id="stuEmpty"><span data-i18n="Aún no hay estudiantes cargados. El autocompletado por RUN se activa al cargar un Excel.">Aún no hay estudiantes cargados. El autocompletado por RUN se activa al cargar un Excel.</span></p>
+      <p class="stu-empty" id="stuEmpty"><span data-i18n="Aún no hay estudiantes cargados. El autocompletado por identificación se activa al cargar un archivo.">Aún no hay estudiantes cargados. El autocompletado por identificación se activa al cargar un archivo.</span></p>
 
       <section class="stu-base" id="stuBase" aria-labelledby="stuBaseTitle" hidden>
         <div class="stu-base-head">
@@ -544,10 +553,10 @@
           </div>
           <button type="button" class="btn btn-ghost btn-small" id="stuDelete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg> <span id="stuDeleteLabel">Eliminar base</span></button>
         </div>
-        <input type="text" id="stuSearch" placeholder="Buscar por RUN, nombre o curso" data-i18n-placeholder="Buscar por RUN, nombre o curso" aria-label="Buscar estudiante" data-i18n-aria-label="Buscar estudiante" autocomplete="off" spellcheck="false">
+        <input type="text" id="stuSearch" placeholder="Buscar por identificación, nombre o curso" data-i18n-placeholder="Buscar por identificación, nombre o curso" aria-label="Buscar estudiante" data-i18n-aria-label="Buscar estudiante" autocomplete="off" spellcheck="false">
         <div class="stu-table-wrap">
           <table class="stu-table">
-            <thead><tr><th scope="col">RUN</th><th scope="col"><span data-i18n="Estudiante">Estudiante</span></th><th scope="col"><span data-i18n="Curso">Curso</span></th></tr></thead>
+            <thead><tr><th scope="col"><span data-i18n="Tipo de identificación">Tipo de identificación</span></th><th scope="col"><span data-i18n="Identificación">Identificación</span></th><th scope="col"><span data-i18n="Estudiante">Estudiante</span></th><th scope="col"><span data-i18n="Curso">Curso</span></th></tr></thead>
             <tbody id="stuRows"></tbody>
           </table>
         </div>

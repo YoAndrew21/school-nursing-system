@@ -90,7 +90,7 @@ function setup({ denied = false, stored = {}, realPdf = false } = {}) {
   inputs.forEach(input => {
     const field = fields[input.name] ||= new Element();
     field.error ||= new Element();
-    field.hints = input.name === 'run' ? [ids.runLookup] : input.name === 'fechaNac' ? [ids.anioNacHint] : [];
+    field.hints = input.name === 'identificationValue' ? [ids.identificationPolicy, ids.provisionalPdfNotice, ids.runLookup] : input.name === 'fechaNac' ? [ids.anioNacHint] : [];
     input.field = field;
   });
   form.querySelectorAll = selector => {
@@ -119,7 +119,7 @@ function setup({ denied = false, stored = {}, realPdf = false } = {}) {
   let previews = 0;
   let generated = 0;
   const context = {
-    document, console, Date, Blob, URL, location: { protocol: 'http:' },
+    document, console, Date, Blob, URL, TextDecoder, location: { protocol: 'http:' },
     navigator: { pdfViewerEnabled: true },
     localStorage: {
       getItem(key) { if (denied) throw Error('Storage denied'); return storage.get(key) ?? null; },
@@ -149,7 +149,7 @@ function setup({ denied = false, stored = {}, realPdf = false } = {}) {
   vm.runInContext(read('js/estudiantes.js'), context);
   // Expose private pure functions only in this in-memory test copy.
   const source = read('js/app.js').replace('  init();',
-    '  window.review = { parseCalendarDate, computeAge, dateError, renderValidation, clearLocalData, download, openPreview, getData };\n  init();');
+    '  window.review = { parseCalendarDate, computeAge, dateError, renderValidation, clearLocalData, download, openPreview, getData, validRun, validIdentification, lookupStudent, setData };\n  init();');
   vm.runInContext(source, context);
   document.dispatchEvent({ type: 'DOMContentLoaded' });
   return {
@@ -362,4 +362,181 @@ test('real PDF remains Spanish and can produce blobs for preview and download in
     assert.ok(doc.output('blob').size > 0);
     assert.ok(doc.output('arraybuffer').byteLength > 0);
   }
+});
+
+// All identification values below are fictional test fixtures, never issued IPE examples.
+test('RUN validation is unchanged; numeric IPE policy is separate from RUN', () => {
+  const env = setup();
+  assert.equal(env.context.review.validRun('12.345.678-5'), true);
+  assert.equal(env.context.review.validRun('12.345.678-9'), false);
+  assert.equal(env.context.review.validIdentification('run', '12.345.678-9'), false);
+  for (const id of ['123456789', '000123', ' 123456789 ', '1234567890']) {
+    assert.equal(env.context.review.validIdentification('ipe', id), true, id);
+  }
+  for (const id of ['', ' ', '1'.repeat(31), 'IPE-DEMO-0001', '123.456', '123-456', '123 456', 'IPE\n123', '識別番号']) {
+    assert.equal(env.context.review.validIdentification('ipe', id), false, id);
+  }
+  assert.equal(env.context.review.validIdentification('unknown', '123'), false);
+});
+
+test('legacy invalid RUN never becomes IPE; explicit malformed IPE reports its own type', async () => {
+  const env = setup();
+  await importRows(env, [['RUN', 'Nombres'], ['12.345.678-5', 'Fictional'], ['IPE-DEMO-0001', 'Rejected'], ['123456789', 'Rejected numeric']]);
+  assert.equal(env.context.DAEStudents.info().count, 1);
+  assert.equal(env.context.DAEStudents.find('123456789', 'ipe'), null);
+  assert.match(env.ids.stuResult.children[1].children[0].textContent, /RUN inválido/);
+  await importRows(env, [['Tipo de identificación', 'Identificación', 'Nombres'], ['IPE', '123456789', 'Fictional IPE'], ['IPE', 'IPE-DEMO-0001', 'Rejected IPE'], ['Unknown', '123', 'Rejected type']]);
+  assert.equal(env.context.DAEStudents.info().count, 1);
+  assert.match(env.ids.stuResult.children[1].children[0].textContent, /IPE inválido/);
+  assert.match(env.ids.stuResult.children[1].children[1].textContent, /Tipo de identificación no reconocido/);
+  for (const lang of ['en', 'ja']) {
+    env.context.I18N.apply(lang);
+    const details = env.ids.stuResult.children[1].children.map(el => el.textContent).join(' ');
+    assert.doesNotMatch(details, /RUN inválido|IPE inválido|Tipo de identificación no reconocido/);
+  }
+});
+
+test('prior provisional storage becomes IPE without erasing values or unrelated fields', () => {
+  const env = setup({ stored: {
+    'dae-enfermeria:v1': JSON.stringify({ schema: 2, identificationType: 'provisional', identificationValue: ' 000123 ', nombres: 'Fictional', curso: 'Demo' }),
+    'dae-enfermeria:estudiantes:v1': JSON.stringify({ students: { 'provisional:000123': { identificationType: 'provisional', identificationValue: ' 000123 ', nombres: 'Fictional stored' } } }),
+  } });
+  assert.equal(env.ids.identificationType.value, 'ipe');
+  assert.equal(env.context.DAEStudents.find('000123', 'ipe').identificationType, 'ipe');
+  assert.equal(env.context.DAEStudents.find('000123', 'ipe').identificationValue, '000123');
+  env.input('identificationType', 'run');
+  assert.equal(env.ids.nombres.value, 'Fictional');
+  assert.equal(env.ids.curso.value, 'Demo');
+  env.input('identificationType', 'ipe');
+  assert.equal(env.ids.nombres.value, 'Fictional');
+});
+
+async function importRows(env, rows, bookType = 'csv') {
+  const X = require('../vendor/xlsx.full.min.js');
+  env.context.XLSX = X;
+  const wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), 'Estudiantes');
+  const buffer = bookType === 'csv' ? Buffer.from(rows.map(r => r.join(',')).join('\n'))
+    : X.write(wb, { type: 'buffer', bookType });
+  env.ids.stuFile.files = [{ name: `fictional.${bookType === 'biff8' ? 'xls' : bookType}`, arrayBuffer: async () => buffer }];
+  env.ids.stuFile.dispatchEvent({ type: 'change' });
+  await new Promise(setImmediate);
+}
+
+test('mixed CSV, XLSX and XLS import uses typed keys and preserves provisional values', async () => {
+  for (const format of ['csv', 'xlsx', 'biff8']) {
+    const env = setup();
+    await importRows(env, [
+      ['Identificación', 'Tipo de identificación', 'Nombres', 'Curso'],
+      ['12.345.678-5', 'RUN', 'Fictional RUN', 'Demo A'],
+      ['123456789', 'IPE', 'Fictional provisional', 'Demo B'],
+      ['123456785', 'IPE', 'Fictional collision', 'Demo C'],
+      ['000123', 'Provisional', 'Fictional zeros', 'Demo D'],
+      ['12.345.678-9', 'RUN', 'Rejected RUN', 'Demo'],
+      ['anything', 'unknown', 'Rejected type', 'Demo'],
+    ], format);
+    const students = env.context.DAEStudents;
+    assert.equal(students.info().count, 4, format);
+    assert.equal(students.find('12.345.678-5').identificationType, 'run');
+    assert.equal(students.find('123456785', 'ipe').nombres, 'Fictional collision');
+    assert.equal(students.find('123456789', 'run'), null);
+    assert.equal(students.find('000123', 'ipe').identificationValue, '000123');
+    for (const query of ['12.345.678-5', '000123']) {
+      env.ids.stuSearch.value = query;
+      env.ids.stuSearch.dispatchEvent({ type: 'input' });
+      assert.equal(env.ids.stuRows.children.length, query === '12.345.678-5' ? 2 : 1);
+    }
+    const saved = JSON.parse(env.storage.get('dae-enfermeria:estudiantes:v1'));
+    assert.equal(saved.schema, 2);
+    assert.ok(saved.students['run:123456785']);
+    assert.ok(saved.students['ipe:123456785']);
+    assert.equal(saved.students['ipe:123456785'].run, '');
+    env.input('identificationValue', '12.345.678-5');
+    assert.equal(env.ids.nombres.value, 'Fictional RUN');
+    env.input('identificationType', 'ipe');
+    env.input('identificationValue', '123456789');
+    env.blur('identificationValue');
+    assert.equal(env.ids.nombres.value, 'Fictional provisional');
+    assert.equal(env.context.review.getData().identificationValue, '123456789');
+    assert.equal(env.context.review.getData().run, '');
+    env.flush();
+    const restored = setup({ stored: Object.fromEntries(env.storage) });
+    assert.equal(restored.ids.identificationType.value, 'ipe');
+    assert.equal(restored.ids.run.value, '123456789');
+    assert.equal(restored.context.DAEStudents.find('123456785', 'ipe').nombres, 'Fictional collision');
+  }
+});
+
+test('legacy database, draft and RUN-only spreadsheet remain compatible', async () => {
+  const env = setup({ stored: {
+    'dae-enfermeria:v1': JSON.stringify({ schema: 2, run: '12.345.678-5', nombres: 'Fictional draft' }),
+    'dae-enfermeria:estudiantes:v1': JSON.stringify({ students: { '123456785': { run: '12.345.678-5', nombres: 'Fictional legacy' } } }),
+  } });
+  assert.equal(env.ids.identificationType.value, 'run');
+  assert.equal(env.ids.run.value, '12.345.678-5');
+  assert.equal(env.context.DAEStudents.find('12.345.678-5').identificationType, 'run');
+  await importRows(env, [['RUN', 'Nombres'], ['12.345.678-5', 'Fictional import']]);
+  assert.equal(env.context.DAEStudents.info().count, 1);
+  assert.equal(env.context.DAEStudents.find('123456785').nombres, 'Fictional import');
+  // New files may retain RUN as their value column with an explicit provisional type.
+  await importRows(env, [['RUN', 'Tipo de identificación', 'Nombres'], ['000123', 'IPE', 'Fictional IPE']]);
+  assert.equal(env.context.DAEStudents.find('000123', 'ipe').identificationValue, '000123');
+  env.ids.stuFile.files = [{ name: 'fictional-legacy.csv', arrayBuffer: async () => Buffer.from('RUN,Nombres\n12.345.678-5,Fictício', 'latin1') }];
+  env.ids.stuFile.dispatchEvent({ type: 'change' });
+  await new Promise(setImmediate);
+  assert.equal(env.context.DAEStudents.find('123456785').nombres, 'Fictício');
+});
+
+test('identification controls, errors and PDF notice translate in ES/EN/JA', () => {
+  const env = setup();
+  env.input('identificationType', 'ipe');
+  env.blur('identificationValue');
+  assert.equal(env.ids.run.getAttribute('aria-invalid'), 'true');
+  assert.match(env.ids.run.getAttribute('aria-describedby'), /identificationPolicy/);
+  for (const language of ['es', 'en', 'ja']) {
+    env.context.I18N.apply(language);
+    assert.equal(env.ids.identificationLabel.textContent, env.context.I18N.t('IPE — Identificador Provisorio Escolar'));
+    assert.ok(env.ids.identificationPolicy.textContent);
+    assert.equal(env.ids.provisionalPdfNotice.hidden, false);
+    assert.ok(env.fields.identificationValue.error.textContent);
+    assert.match(env.ids.run.placeholder, /123456789/);
+  }
+  env.input('identificationValue', '123456789');
+  assert.equal(env.ids.run.getAttribute('aria-invalid'), 'false');
+  env.input('identificationType', 'run');
+  assert.equal(env.ids.run.value, '');
+  assert.equal(env.ids.provisionalPdfNotice.hidden, true);
+});
+
+test('Spanish PDF uses the existing official identification field for both types', () => {
+  const env = setup({ realPdf: true });
+  for (const language of ['es', 'en', 'ja']) {
+    env.context.I18N.apply(language);
+    const pdf = env.context.DAE.buildPdf({ identificationType: 'ipe', identificationValue: '123456789', nombres: 'Fictional' });
+    const page = pdf.internal.pages[1].join('\n');
+    assert.match(page, /R.U.N. ALUMNO/);
+    assert.match(page, /123456789/);
+    assert.match(page, /DECLARACION INDIVIDUAL DE ACCIDENTE ESCOLAR/);
+    assert.ok(pdf.output('blob').size > 0);
+    const legacy = env.context.DAE.buildPdf({ run: '12.345.678-5' });
+    const typed = env.context.DAE.buildPdf({ identificationType: 'run', identificationValue: '12.345.678-5' });
+    assert.equal(typed.internal.pages[1].join('\n'), legacy.internal.pages[1].join('\n'));
+  }
+});
+
+test('updated template has typed identification, text format and preserved dropdowns/frozen panes', () => {
+  const X = require('../vendor/xlsx.full.min.js');
+  const buffer = fs.readFileSync(path.join(root, 'plantillas/Plantilla_Estudiantes.xlsx'));
+  const wb = X.read(buffer, { type: 'buffer', cellNF: true, sheetStubs: true });
+  assert.equal(wb.Sheets.Estudiantes.A4.v, 'Identificación *');
+  assert.equal(wb.Sheets.Estudiantes.O4.v, 'Tipo de identificación');
+  assert.equal(wb.Sheets.Estudiantes.A5.z, '@');
+  const zip = X.CFB.read(buffer, { type: 'buffer' });
+  const i = zip.FullPaths.findIndex(p => p.endsWith('/xl/worksheets/sheet1.xml'));
+  const xml = Buffer.from(zip.FileIndex[i].content).toString();
+  assert.match(xml, /xSplit="1" ySplit="4"/);
+  assert.match(xml, /RUN,IPE/);
+  assert.match(xml, /OFFSET\(Listas!/);
+  assert.doesNotMatch(xml, /sqref="A10:A3004"/);
+  assert.doesNotMatch(xml, /El RUN debe tener entre 3 y 12/);
 });

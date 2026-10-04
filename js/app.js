@@ -15,6 +15,7 @@
   const form = $('#daeForm');
 
   const DEFAULTS = {
+    identificationType: 'run',
     tipoEst: '2',
     estNombre: 'Colegio San Maximiliano Kolbe',
     estProvincia: 'Llanquihue',
@@ -35,7 +36,7 @@
     { name: 'curso', label: 'Curso', section: 'sec-a' },
     { name: 'apPaterno', label: 'Apellido paterno', section: 'sec-b' },
     { name: 'nombres', label: 'Nombres', section: 'sec-b' },
-    { name: 'run', label: 'R.U.N. del alumno (válido)', section: 'sec-b', check: validRun },
+    { name: 'identificationValue', label: 'Identificación del estudiante', section: 'sec-b', check: (value, data) => validIdentification(data.identificationType, value) },
     { name: 'sexo', label: 'Sexo', section: 'sec-b' },
     { name: 'fechaAcc', label: 'Fecha del accidente', section: 'sec-c' },
     { name: 'horaAcc', label: 'Hora del accidente', section: 'sec-c' },
@@ -44,7 +45,7 @@
   ];
 
   // Campos que se completan desde la base de estudiantes (carga masiva)
-  const STUDENT_FIELDS = ['run', 'apPaterno', 'apMaterno', 'nombres', 'sexo', 'fechaNac', 'curso', 'horario', 'calle', 'numero', 'poblacion', 'resComuna', 'resProvincia', 'codifCom'];
+  const STUDENT_FIELDS = ['identificationType', 'identificationValue', 'apPaterno', 'apMaterno', 'nombres', 'sexo', 'fechaNac', 'curso', 'horario', 'calle', 'numero', 'poblacion', 'resComuna', 'resProvincia', 'codifCom'];
 
   const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -100,6 +101,29 @@
     return body.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + c.slice(-1);
   }
 
+  function validIdentification(type, value) {
+    if (type === 'run') return validRun(value);
+    if (type === 'ipe') return DAEStudents.identification.validIpe(value);
+    return false;
+  }
+
+  function renderIdentification() {
+    const provisional = $('#identificationType').value === 'ipe';
+    const input = $('#run');
+    input.maxLength = provisional ? DAEStudents.identification.ipeMaxLength : 12;
+    input.placeholder = provisional ? tr('Ejemplo ficticio: 123456789') : '12.345.678-9';
+    input.setAttribute('autocapitalize', provisional ? 'none' : 'characters');
+    input.setAttribute('inputmode', provisional ? 'numeric' : 'text');
+    $('#identificationLabel').textContent = tr(provisional ? 'IPE — Identificador Provisorio Escolar' : 'R.U.N. del alumno');
+    $('#identificationPolicy').textContent = tr(provisional
+      ? 'Ingrese entre 1 y 30 dígitos, sin puntos ni guion. El límite es técnico, no un formato oficial de IPE. No se verifica el dígito de RUN.'
+      : 'Ingrese un RUN válido (revise el dígito verificador).');
+    $('#provisionalPdfNotice').hidden = !provisional;
+    fieldEl('identificationValue').querySelector('.field-error').textContent = tr(provisional
+      ? 'IPE inválido: ingrese entre 1 y 30 dígitos, sin puntos ni guion.'
+      : 'Ingrese un RUN válido (revise el dígito verificador).');
+  }
+
   function computeAge(birth, ref) {
     const b = parseCalendarDate(birth);
     const r = parseCalendarDate(ref || todayISO());
@@ -134,10 +158,18 @@
       }
     });
     data.firma = signature.value();
+    // Keep the legacy RUN property for existing PDF callers; IPE is never a RUN.
+    data.run = data.identificationType === 'run' ? data.identificationValue : '';
     return data;
   }
 
   function setData(data) {
+    data = { ...data };
+    if (data.identificationType === 'provisional') data.identificationType = 'ipe';
+    if ('run' in data && !('identificationValue' in data)) data.identificationValue = data.run;
+    if ('run' in data && !('identificationType' in data)) data.identificationType = 'run';
+    if ('identificationType' in data) $('#identificationType').value = data.identificationType;
+    renderIdentification();
     Array.from(form.elements).forEach((el) => {
       if (!el.name || !(el.name in data)) return;
       if (el.type === 'radio') el.checked = el.value === data[el.name];
@@ -227,7 +259,7 @@
   function isFilled(req, data) {
     const v = String(data[req.name] || '').trim();
     if (!v) return false;
-    return req.check ? req.check(v) : true;
+    return req.check ? req.check(v, data) : true;
   }
 
   function fieldEl(name) {
@@ -342,7 +374,14 @@
       const clean = el.value.replace(/\D/g, '');
       if (clean !== el.value) el.value = clean;
     }
-    if (el.matches('#run, [data-run]')) {
+    if (el.name === 'identificationType') {
+      $('#run').value = '';
+      lookupKey = '';
+      lookupState = '';
+      renderIdentification();
+      renderRunLookup();
+    }
+    if (el.matches('[data-run]') || (el.id === 'run' && $('#identificationType').value === 'run')) {
       const clean = el.value.replace(/[^0-9kK.\-]/g, '');
       if (clean !== el.value) el.value = clean;
     }
@@ -354,7 +393,7 @@
     if (el.type === 'radio') touched.add(el.name);
     // Con guion y dígito verificador el RUN está completo; sin guion se busca al salir del campo
     if (el.id === 'run') {
-      if (/-\s*[0-9kK]$/.test(el.value) && lookupStudent()) return;
+      if ($('#identificationType').value === 'run' && /-\s*[0-9kK]$/.test(el.value) && lookupStudent()) return;
       renderRunLookup();
     }
     refresh();
@@ -363,7 +402,8 @@
   form.addEventListener('focusout', (e) => {
     const el = e.target;
     if (!el.name) return;
-    if (el.matches('#run, [data-run]') && el.value.trim()) el.value = formatRun(el.value);
+    if (el.value.trim() && (el.matches('[data-run]') || (el.id === 'run' && $('#identificationType').value === 'run'))) el.value = formatRun(el.value);
+    else if (el.id === 'run') el.value = el.value.trim();
     if (el.type !== 'radio') touched.add(el.name);
     if (el.id === 'run' && lookupStudent()) return;
     refresh();
@@ -375,36 +415,38 @@
 
   /* ---------- base de estudiantes: autocompletado por RUN ---------- */
 
-  let lookupRun = ''; // último RUN buscado, para no volver a sobrescribir datos editados
+  let lookupKey = ''; // Typed identity last looked up; protects edited auto-filled values.
   let lookupState = '';
 
   function renderRunLookup() {
     const info = DAEStudents.info();
     const box = $('#runLookup');
-    const current = cleanRun($('#run').value);
-    const state = current && current === lookupRun ? lookupState : '';
+    const current = DAEStudents.identification.key($('#identificationType').value, $('#run').value);
+    const state = $('#run').value.trim() && current === lookupKey ? lookupState : '';
     box.className = 'hint run-lookup' + (state ? ` is-${state}` : '');
     let msg;
-    if (!info) msg = tr('Sin base de estudiantes: cargue un Excel para completar los datos con el RUN.');
+    if (!info) msg = tr('Sin base de estudiantes: cargue un archivo para completar los datos con su identificación.');
     else if (state === 'found') msg = tr('✓ Datos completados desde la base de estudiantes.');
-    else if (state === 'missing') msg = tr('RUN no encontrado en la base de estudiantes.');
-    else msg = tr('Base de {count} estudiantes: al ingresar el RUN se completan sus datos.', { count: info.count });
+    else if (state === 'missing') msg = tr('Identificación no encontrada en la base de estudiantes para el tipo seleccionado.');
+    else msg = tr('Base de {count} estudiantes: seleccione el tipo e ingrese la identificación para completar sus datos.', { count: info.count });
     $('#runLookupText').textContent = msg;
   }
 
   // Devuelve true si completó el formulario (ya actualizado)
   function lookupStudent() {
-    const run = cleanRun($('#run').value);
-    if (run !== lookupRun) {
-      lookupRun = '';
+    const type = $('#identificationType').value;
+    const value = $('#run').value.trim();
+    const key = DAEStudents.identification.key(type, value);
+    if (key !== lookupKey) {
+      lookupKey = '';
       lookupState = '';
     }
-    if (!DAEStudents.info() || !validRun(run) || run === lookupRun) {
+    if (!DAEStudents.info() || !validIdentification(type, value) || key === lookupKey) {
       renderRunLookup();
       return false;
     }
-    lookupRun = run;
-    const student = DAEStudents.find(run);
+    lookupKey = key;
+    const student = DAEStudents.find(value, type);
     lookupState = student ? 'found' : 'missing';
     renderRunLookup();
     if (!student) return false;
@@ -414,19 +456,19 @@
       next[k] = student[k] || '';
     });
     if (!next.horario) delete next.horario; // el horario se conserva entre formularios
-    next.run = formatRun(run);
+    next.identificationValue = type === 'run' ? formatRun(value) : value;
     next.edad = computeAge(next.fechaNac, $('#fechaAcc').value);
     setData(next);
     STUDENT_FIELDS.forEach((k) => touched.add(k));
     refresh();
     renderRunLookup();
     const name = [student.nombres, student.apPaterno].filter(Boolean).join(' ');
-    toast('Datos de {name} cargados desde la base de estudiantes.', { name: name || next.run });
+    toast('Datos de {name} cargados desde la base de estudiantes.', { name: name || next.identificationValue });
     return true;
   }
 
   DAEStudents.onChange(() => {
-    lookupRun = '';
+    lookupKey = '';
     lookupState = '';
     renderRunLookup();
   });
@@ -815,10 +857,11 @@
       next[k] = current[k];
     });
     next.fechaRegistro = todayISO();
+    next.identificationType = 'run';
     setData(next);
     touched.clear();
     showAllErrors = false;
-    lookupRun = '';
+    lookupKey = '';
     lookupState = '';
     renderRunLookup();
     $('#asisDetails').open = false;
@@ -846,11 +889,12 @@
     try { DAEStudents.clearLocalData(); } catch (_) { failed = true; }
     const empty = { firma: '' };
     Array.from(form.elements).forEach(el => { if (el.name) empty[el.name] = ''; });
+    empty.identificationType = 'run';
     setData(empty);
     $('#keepSignature').checked = true;
     touched.clear();
     showAllErrors = false;
-    lookupRun = '';
+    lookupKey = '';
     lookupState = '';
     $('#asisDetails').open = false;
     renderDerived(getData());
@@ -866,6 +910,7 @@
   }
 
   document.addEventListener('languagechange', () => {
+    renderIdentification();
     renderRunLookup();
     preview.init();
     renderDerived(getData());
@@ -1024,7 +1069,7 @@
     renderValidation(data);
     renderCircMeter.flush();
     // Un borrador recuperado no se sobrescribe con la base al salir del campo RUN
-    lookupRun = validRun(data.run) ? cleanRun(data.run) : '';
+    lookupKey = validIdentification(data.identificationType, data.identificationValue) ? DAEStudents.identification.key(data.identificationType, data.identificationValue) : '';
     renderRunLookup();
     initActiveSection();
     preview.init();

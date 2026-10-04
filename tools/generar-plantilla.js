@@ -54,9 +54,9 @@ const openList = (key, prompt) => ({
 
 const COLUMNS = [
   {
-    header: 'RUN *', width: 16, numFmt: '@',
-    help: ['Obligatorio', 'Con o sin puntos, con guion y dígito verificador.', '12.345.678-5'],
-    validation: { type: 'textLength', operator: 'between', formulae: [3, 12], errorStyle: 'warning', error: 'El RUN debe tener entre 3 y 12 caracteres, ej: 12.345.678-5.', prompt: 'Ej: 12.345.678-5' },
+    header: 'Identificación *', width: 24, numFmt: '@',
+    help: ['Obligatorio', 'RUN con dígito verificador o IPE numérico. Use texto para conservar ceros iniciales. Ejemplos ficticios, no identificadores emitidos.', '12.345.678-5 / 123456789 (ficticio; no emitido oficialmente)'],
+    validation: { type: 'textLength', operator: 'between', formulae: [1, 30], errorStyle: 'warning', error: 'Ingrese entre 1 y 30 caracteres. RUN requiere dígito verificador; IPE usa solo dígitos sin validar dígito RUN.', prompt: 'RUN o IPE; seleccione el tipo explícitamente.' },
   },
   { header: 'Apellido paterno *', width: 20, help: ['Obligatorio', 'Texto.', 'González'] },
   { header: 'Apellido materno', width: 20, help: ['Opcional', 'Texto.', 'Pérez'] },
@@ -82,6 +82,11 @@ const COLUMNS = [
     header: 'Codif. comuna', width: 15, numFmt: '0',
     help: ['Opcional', 'Número de hasta 3 dígitos.', '101'],
     validation: { type: 'whole', operator: 'between', formulae: [0, 999], errorStyle: 'stop', error: 'Ingrese un número de hasta 3 dígitos.', prompt: 'Hasta 3 dígitos' },
+  },
+  {
+    header: 'Tipo de identificación', width: 24,
+    help: ['Opcional', 'RUN o IPE. Vacío se interpreta como RUN. IPE: 1–30 dígitos, límite técnico, sin regla oficial de longitud o dígito verificador.', 'IPE'],
+    validation: { type: 'list', formulae: ['"RUN,IPE"'], errorStyle: 'stop', error: 'Seleccione RUN o IPE.', prompt: 'Vacío = RUN. Seleccione IPE para otro identificador.' },
   },
 ];
 
@@ -118,7 +123,7 @@ async function main() {
   banner(
     ws,
     'Base de estudiantes · Carga masiva',
-    'Escriba o pegue un estudiante por fila. Las columnas con * son obligatorias. Sexo, Curso, Horario, Comuna y Provincia tienen listas desplegables (las listas se editan en la hoja «Listas»).',
+    'Un estudiante por fila. Seleccione RUN o IPE en Tipo de identificación (vacío = RUN). Escriba la identificación como texto. Las columnas con * son obligatorias.',
     lastCol
   );
   ws.getRow(3).height = 8;
@@ -171,13 +176,20 @@ async function main() {
     columns: [{ name: 'Columna' }, { name: 'Obligatoria' }, { name: 'Cómo completarla' }, { name: 'Ejemplo' }],
     rows: COLUMNS.map((c) => [c.header.replace(' *', ''), c.help[0], c.help[1], c.help[2]]),
   });
+  info.getCell('C5').alignment = { wrapText: true };
+  info.getCell('D5').alignment = { wrapText: true };
+  info.getRow(5).height = 66;
+  info.getCell('C19').alignment = { wrapText: true };
+  info.getRow(19).height = 66;
   const notesStart = 4 + COLUMNS.length + 2;
   [
     'Notas',
     '• Un estudiante por fila. Puede pegar datos copiados desde otra planilla (use «Pegar valores»).',
     '• No cambie los nombres de las columnas ni el nombre de la hoja «Estudiantes».',
-    '• Si un RUN se repite, se usa la última fila. Las filas con RUN inválido se omiten y se informan al cargar.',
+    '• Identificación repetida del mismo tipo: se usa la última fila. Los RUN inválidos y los identificadores provisionales que no cumplen la regla técnica se omiten y se informan.',
     '• Al cargar un archivo nuevo en la aplicación se reemplaza la base anterior.',
+    '• Las planillas antiguas con columna RUN siguen siendo compatibles. Identificación acepta RUN o IPE según el tipo seleccionado; no se infiere el tipo por el valor.',
+    '• El PDF conserva la etiqueta oficial R.U.N. ALUMNO. Revise que el valor provisional se vea completo y confirme su uso con la institución receptora.',
   ].forEach((text, k) => {
     const cell = info.getCell(`A${notesStart + k}`);
     cell.value = text;
