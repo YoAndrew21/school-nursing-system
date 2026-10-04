@@ -345,7 +345,7 @@ textarea { resize: vertical; min-height: 130px; }
 .field.is-invalid .field-error { display: block; }
 .field.is-invalid input,
 .field.is-invalid textarea { border-color: var(--danger); background: var(--danger-soft); }
-.field.is-invalid .seg span { border-color: var(--danger); }
+.field.is-invalid .seg label > span { border-color: var(--danger); }
 
 .meter {
   display: flex;
@@ -370,7 +370,7 @@ textarea { resize: vertical; min-height: 130px; }
 .seg { display: flex; gap: 8px; flex-wrap: wrap; }
 .seg label { flex: 1 1 0; min-width: 130px; position: relative; }
 .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.seg span {
+.seg label > span {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -384,7 +384,7 @@ textarea { resize: vertical; min-height: 130px; }
   user-select: none;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.seg span:hover { border-color: #9cb0bf; }
+.seg label > span:hover { border-color: #9cb0bf; }
 .seg span b {
   min-width: 24px;
   height: 24px;

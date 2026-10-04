@@ -12,7 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Accidente Escolar">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Declaración de Accidente Escolar · Enfermería</title>
+  <title data-i18n="Declaración de Accidente Escolar · Enfermería">Declaración de Accidente Escolar · Enfermería</title>
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#formulario">Saltar al formulario</a>
+  <a class="skip-link" href="#formulario"><span data-i18n="Saltar al formulario">Saltar al formulario</span></a>
 
   <header class="topbar">
     <div class="topbar-inner">
@@ -29,14 +29,14 @@
           <svg viewBox="0 0 32 32"><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
         </span>
         <div class="brand-text">
-          <p class="brand-kicker">Enfermería · Colegio San Maximiliano Kolbe</p>
-          <h1>Declaración <span class="hide-phone">Individual </span>de Accidente Escolar</h1>
+          <p class="brand-kicker"><span data-i18n="Enfermería · Colegio San Maximiliano Kolbe">Enfermería · Colegio San Maximiliano Kolbe</span></p>
+          <h1><span data-i18n="Declaración">Declaración</span> <span class="hide-phone"><span data-i18n="Individual">Individual</span> </span><span data-i18n="de Accidente Escolar">de Accidente Escolar</span></h1>
         </div>
       </div>
       <div class="language-switch" role="group" aria-label="Language / Idioma / 言語">
-        <button type="button" data-lang="es" aria-label="Español">ES</button>
-        <button type="button" data-lang="en" aria-label="English">EN</button>
-        <button type="button" data-lang="ja" aria-label="日本語">日本語</button>
+        <button type="button" data-lang="es" aria-pressed="true" aria-label="Español">ES</button>
+        <button type="button" data-lang="en" aria-pressed="false" aria-label="English">EN</button>
+        <button type="button" data-lang="ja" aria-pressed="false" aria-label="日本語">日本語</button>
       </div>
       <p class="save-status" id="saveStatus" aria-live="polite">
         <span class="save-dot" aria-hidden="true"></span><span class="save-text">Borrador local</span>
@@ -46,18 +46,18 @@
 
   <div class="layout">
     <!-- Navegación de secciones: barra lateral en notebook/monitor, franja deslizable en teléfono/tableta -->
-    <aside class="sidebar" aria-label="Secciones y acciones">
-      <nav class="steps" aria-label="Secciones del formulario">
-        <a href="#sec-a" data-step="sec-a"><span class="step-dot" aria-hidden="true">A</span><span class="step-label">Establecimiento</span></a>
-        <a href="#sec-b" data-step="sec-b"><span class="step-dot" aria-hidden="true">B</span><span class="step-label">Accidentado</span></a>
-        <a href="#sec-c" data-step="sec-c"><span class="step-dot" aria-hidden="true">C</span><span class="step-label">Accidente</span></a>
-        <a href="#sec-e" data-step="sec-e"><span class="step-dot" aria-hidden="true">✎</span><span class="step-label">Circunstancia y firma</span></a>
-        <a href="#sec-d" data-step="sec-d" data-optional><span class="step-dot" aria-hidden="true">D</span><span class="step-label">Atención asistencial</span></a>
+    <aside class="sidebar" aria-label="Secciones y acciones" data-i18n-aria-label="Secciones y acciones">
+      <nav class="steps" aria-label="Secciones del formulario" data-i18n-aria-label="Secciones del formulario">
+        <a href="#sec-a" data-step="sec-a"><span class="step-dot" aria-hidden="true">A</span><span class="step-label"><span data-i18n="Establecimiento">Establecimiento</span></span></a>
+        <a href="#sec-b" data-step="sec-b"><span class="step-dot" aria-hidden="true">B</span><span class="step-label"><span data-i18n="Accidentado">Accidentado</span></span></a>
+        <a href="#sec-c" data-step="sec-c"><span class="step-dot" aria-hidden="true">C</span><span class="step-label"><span data-i18n="Accidente">Accidente</span></span></a>
+        <a href="#sec-e" data-step="sec-e"><span class="step-dot" aria-hidden="true">✎</span><span class="step-label"><span data-i18n="Circunstancia y firma">Circunstancia y firma</span></span></a>
+        <a href="#sec-d" data-step="sec-d" data-optional><span class="step-dot" aria-hidden="true">D</span><span class="step-label"><span data-i18n="Atención asistencial">Atención asistencial</span></span></a>
       </nav>
 
       <div class="progress-box">
         <div class="progress-head">
-          <span>Campos obligatorios</span>
+          <span><span data-i18n="Campos obligatorios">Campos obligatorios</span></span>
           <strong id="progressText">0 de 9</strong>
         </div>
         <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
@@ -66,21 +66,21 @@
       <div class="side-actions">
         <button type="button" class="btn btn-primary" data-action="download">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
-          Descargar PDF
+          <span data-i18n="Descargar PDF">Descargar PDF</span>
         </button>
         <button type="button" class="btn btn-secondary only-preview-tab" data-action="preview">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
-          Vista previa
+          <span data-i18n="Vista previa">Vista previa</span>
         </button>
         <button type="button" class="btn btn-secondary" data-action="students">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 20v-1.5A3.5 3.5 0 0 0 12 15H7a3.5 3.5 0 0 0-3.5 3.5V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20.5 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>
-          Carga masiva
+          <span data-i18n="Carga masiva">Carga masiva</span>
         </button>
         <button type="button" class="btn btn-ghost" data-action="reset">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
-          Nuevo formulario
+          <span data-i18n="Nuevo formulario">Nuevo formulario</span>
         </button>
-        <p class="side-note">Los datos se guardan solo en este navegador. Nada se envía a internet.<br><span class="app-version">Versión 1.3.2</span></p>
+        <p class="side-note"><span data-i18n="Los datos se guardan solo en este navegador. Nada se envía a internet.">Los datos se guardan solo en este navegador. Nada se envía a internet.</span><br><span class="app-version" id="appVersion">Versión 1.3.2</span></p>
       </div>
     </aside>
 
@@ -92,49 +92,50 @@
           <header class="card-head">
             <span class="card-badge" aria-hidden="true">A</span>
             <div>
-              <h2 id="sec-a-title">Individualización del establecimiento</h2>
-              <p class="card-desc">Datos del colegio y del registro. Vienen prellenados y se conservan entre formularios.</p>
+              <h2 id="sec-a-title"><span data-i18n="Individualización del establecimiento">Individualización del establecimiento</span></h2>
+              <p class="card-desc"><span data-i18n="Datos del colegio y del registro. Vienen prellenados y se conservan entre formularios.">Datos del colegio y del registro. Vienen prellenados y se conservan entre formularios.</span></p>
             </div>
           </header>
 
           <div class="grid">
             <div class="field span-2">
-              <span class="label" id="lbl-tipoEst">Tipo de establecimiento</span>
+              <span class="label" id="lbl-tipoEst"><span data-i18n="Tipo de establecimiento">Tipo de establecimiento</span></span>
               <div class="seg" role="radiogroup" aria-labelledby="lbl-tipoEst">
-                <label><input type="radio" name="tipoEst" value="1"><span>Fiscal o municipal <b>1</b></span></label>
-                <label><input type="radio" name="tipoEst" value="2" checked><span>Particular <b>2</b></span></label>
+                <label><input type="radio" name="tipoEst" value="1"><span><span data-i18n="Fiscal o municipal">Fiscal o municipal</span> <b>1</b></span></label>
+                <label><input type="radio" name="tipoEst" value="2" checked><span><span data-i18n="Particular">Particular</span> <b>2</b></span></label>
               </div>
             </div>
             <div class="field">
-              <label for="folio">N° de declaración</label>
-              <input id="folio" name="folio" type="text" maxlength="12" placeholder="Opcional">
+              <label for="folio"><span data-i18n="N° de declaración">N° de declaración</span></label>
+              <input id="folio" name="folio" type="text" maxlength="12" placeholder="Opcional" data-i18n-placeholder="Opcional">
             </div>
 
             <div class="field full">
-              <label for="estNombre">Nombre del establecimiento</label>
+              <label for="estNombre"><span data-i18n="Nombre del establecimiento">Nombre del establecimiento</span></label>
               <input id="estNombre" name="estNombre" type="text" maxlength="80">
             </div>
             <div class="field">
-              <label for="estProvincia">Provincia</label>
+              <label for="estProvincia"><span data-i18n="Provincia">Provincia</span></label>
               <input id="estProvincia" name="estProvincia" type="text" maxlength="40">
             </div>
             <div class="field">
-              <label for="estComuna">Comuna</label>
+              <label for="estComuna"><span data-i18n="Comuna">Comuna</span></label>
               <input id="estComuna" name="estComuna" type="text" maxlength="40">
             </div>
             <div class="field">
-              <label for="fechaRegistro">Fecha de registro de los datos</label>
+              <label for="fechaRegistro"><span data-i18n="Fecha de registro de los datos">Fecha de registro de los datos</span></label>
               <input id="fechaRegistro" name="fechaRegistro" type="date">
+              <p class="field-error" id="fechaRegistroError"></p>
             </div>
 
             <div class="field" data-required>
-              <label for="curso">Curso <span class="req" aria-hidden="true">*</span></label>
-              <input id="curso" name="curso" type="text" maxlength="30" placeholder="Ej: 5° Básico B" list="cursosList" required>
-              <p class="field-error">Indique el curso del alumno.</p>
+              <label for="curso"><span data-i18n="Curso">Curso</span> <span class="req" aria-hidden="true">*</span></label>
+              <input id="curso" name="curso" type="text" maxlength="30" placeholder="Ej: 5° Básico B" data-i18n-placeholder="Ej: 5° Básico B" list="cursosList" required>
+              <p class="field-error"><span data-i18n="Indique el curso del alumno.">Indique el curso del alumno.</span></p>
             </div>
             <div class="field">
-              <label for="horario">Horario</label>
-              <input id="horario" name="horario" type="text" maxlength="30" placeholder="Ej: Jornada mañana" list="horariosList">
+              <label for="horario"><span data-i18n="Horario">Horario</span></label>
+              <input id="horario" name="horario" type="text" maxlength="30" placeholder="Ej: Jornada mañana" data-i18n-placeholder="Ej: Jornada mañana" list="horariosList">
             </div>
           </div>
         </section>
@@ -144,81 +145,82 @@
           <header class="card-head">
             <span class="card-badge" aria-hidden="true">B</span>
             <div>
-              <h2 id="sec-b-title">Individualización del accidentado</h2>
-              <p class="card-desc">Identificación y residencia habitual del alumno o alumna.</p>
+              <h2 id="sec-b-title"><span data-i18n="Individualización del accidentado">Individualización del accidentado</span></h2>
+              <p class="card-desc"><span data-i18n="Identificación y residencia habitual del alumno o alumna.">Identificación y residencia habitual del alumno o alumna.</span></p>
             </div>
           </header>
 
           <div class="grid">
             <div class="field" data-required>
-              <label for="apPaterno">Apellido paterno <span class="req" aria-hidden="true">*</span></label>
+              <label for="apPaterno"><span data-i18n="Apellido paterno">Apellido paterno</span> <span class="req" aria-hidden="true">*</span></label>
               <input id="apPaterno" name="apPaterno" type="text" maxlength="30" autocapitalize="words" required>
-              <p class="field-error">Ingrese el apellido paterno.</p>
+              <p class="field-error"><span data-i18n="Ingrese el apellido paterno.">Ingrese el apellido paterno.</span></p>
             </div>
             <div class="field">
-              <label for="apMaterno">Apellido materno</label>
+              <label for="apMaterno"><span data-i18n="Apellido materno">Apellido materno</span></label>
               <input id="apMaterno" name="apMaterno" type="text" maxlength="30" autocapitalize="words">
             </div>
             <div class="field" data-required>
-              <label for="nombres">Nombres <span class="req" aria-hidden="true">*</span></label>
+              <label for="nombres"><span data-i18n="Nombres">Nombres</span> <span class="req" aria-hidden="true">*</span></label>
               <input id="nombres" name="nombres" type="text" maxlength="40" autocapitalize="words" required>
-              <p class="field-error">Ingrese los nombres.</p>
+              <p class="field-error"><span data-i18n="Ingrese los nombres.">Ingrese los nombres.</span></p>
             </div>
 
             <div class="field" data-required>
-              <label for="run">R.U.N. del alumno <span class="req" aria-hidden="true">*</span></label>
+              <label for="run"><span data-i18n="R.U.N. del alumno">R.U.N. del alumno</span> <span class="req" aria-hidden="true">*</span></label>
               <input id="run" name="run" type="text" maxlength="12" placeholder="12.345.678-9" inputmode="text" autocapitalize="characters" spellcheck="false" required>
-              <p class="field-error">Ingrese un RUN válido (revise el dígito verificador).</p>
+              <p class="field-error"><span data-i18n="Ingrese un RUN válido (revise el dígito verificador).">Ingrese un RUN válido (revise el dígito verificador).</span></p>
               <p class="hint run-lookup" id="runLookup" aria-live="polite">
                 <span id="runLookupText"></span>
-                <button type="button" class="link-btn" data-action="students">Carga masiva</button>
+                <button type="button" class="link-btn" data-action="students"><span data-i18n="Carga masiva">Carga masiva</span></button>
               </p>
             </div>
             <div class="field span-2" data-required>
-              <span class="label" id="lbl-sexo">Sexo <span class="req" aria-hidden="true">*</span></span>
+              <span class="label" id="lbl-sexo"><span data-i18n="Sexo">Sexo</span> <span class="req" aria-hidden="true">*</span></span>
               <div class="seg" role="radiogroup" aria-labelledby="lbl-sexo">
-                <label><input type="radio" name="sexo" value="1" required><span>Masculino <b>1</b></span></label>
-                <label><input type="radio" name="sexo" value="2"><span>Femenino <b>2</b></span></label>
+                <label><input type="radio" name="sexo" value="1" required><span><span data-i18n="Masculino">Masculino</span> <b>1</b></span></label>
+                <label><input type="radio" name="sexo" value="2"><span><span data-i18n="Femenino">Femenino</span> <b>2</b></span></label>
               </div>
-              <p class="field-error">Seleccione el sexo.</p>
+              <p class="field-error"><span data-i18n="Seleccione el sexo.">Seleccione el sexo.</span></p>
             </div>
 
             <div class="field">
-              <label for="fechaNac">Fecha de nacimiento</label>
+              <label for="fechaNac"><span data-i18n="Fecha de nacimiento">Fecha de nacimiento</span></label>
               <input id="fechaNac" name="fechaNac" type="date">
+              <p class="field-error" id="fechaNacError"></p>
               <p class="hint" id="anioNacHint">En el PDF se imprime solo el año.</p>
             </div>
             <div class="field">
-              <label for="edad">Edad</label>
-              <input id="edad" name="edad" type="text" inputmode="numeric" maxlength="2" data-digits placeholder="Se calcula sola">
+              <label for="edad"><span data-i18n="Edad">Edad</span></label>
+              <input id="edad" name="edad" type="text" inputmode="numeric" maxlength="2" data-digits placeholder="Se calcula sola" data-i18n-placeholder="Se calcula sola">
             </div>
           </div>
 
-          <h3 class="subhead">Residencia habitual</h3>
+          <h3 class="subhead"><span data-i18n="Residencia habitual">Residencia habitual</span></h3>
           <div class="grid">
             <div class="field span-2">
-              <label for="calle">Calle</label>
+              <label for="calle"><span data-i18n="Calle">Calle</span></label>
               <input id="calle" name="calle" type="text" maxlength="50">
             </div>
             <div class="field">
-              <label for="numero">Número</label>
+              <label for="numero"><span data-i18n="Número">Número</span></label>
               <input id="numero" name="numero" type="text" maxlength="10">
             </div>
             <div class="field">
-              <label for="poblacion">Población / Villa</label>
+              <label for="poblacion"><span data-i18n="Población / Villa">Población / Villa</span></label>
               <input id="poblacion" name="poblacion" type="text" maxlength="40">
             </div>
             <div class="field">
-              <label for="resComuna">Comuna</label>
-              <input id="resComuna" name="resComuna" type="text" maxlength="30" placeholder="Ej: Puerto Montt">
+              <label for="resComuna"><span data-i18n="Comuna">Comuna</span></label>
+              <input id="resComuna" name="resComuna" type="text" maxlength="30" placeholder="Ej: Puerto Montt" data-i18n-placeholder="Ej: Puerto Montt">
             </div>
             <div class="field">
-              <label for="resProvincia">Provincia</label>
-              <input id="resProvincia" name="resProvincia" type="text" maxlength="30" placeholder="Ej: Llanquihue">
+              <label for="resProvincia"><span data-i18n="Provincia">Provincia</span></label>
+              <input id="resProvincia" name="resProvincia" type="text" maxlength="30" placeholder="Ej: Llanquihue" data-i18n-placeholder="Ej: Llanquihue">
             </div>
             <div class="field">
-              <label for="codifCom">Codif. comuna</label>
-              <input id="codifCom" name="codifCom" type="text" inputmode="numeric" maxlength="3" data-digits placeholder="3 dígitos">
+              <label for="codifCom"><span data-i18n="Codif. comuna">Codif. comuna</span></label>
+              <input id="codifCom" name="codifCom" type="text" inputmode="numeric" maxlength="3" data-digits placeholder="3 dígitos" data-i18n-placeholder="3 dígitos">
             </div>
           </div>
         </section>
@@ -228,54 +230,54 @@
           <header class="card-head">
             <span class="card-badge" aria-hidden="true">C</span>
             <div>
-              <h2 id="sec-c-title">Informe sobre el accidente</h2>
-              <p class="card-desc">Fecha, hora y tipo. El día de la semana se calcula automáticamente.</p>
+              <h2 id="sec-c-title"><span data-i18n="Informe sobre el accidente">Informe sobre el accidente</span></h2>
+              <p class="card-desc"><span data-i18n="Fecha, hora y tipo. El día de la semana se calcula automáticamente.">Fecha, hora y tipo. El día de la semana se calcula automáticamente.</span></p>
             </div>
           </header>
 
           <div class="grid">
             <div class="field" data-required>
-              <label for="fechaAcc">Fecha del accidente <span class="req" aria-hidden="true">*</span></label>
+              <label for="fechaAcc"><span data-i18n="Fecha del accidente">Fecha del accidente</span> <span class="req" aria-hidden="true">*</span></label>
               <input id="fechaAcc" name="fechaAcc" type="date" required>
-              <p class="field-error">Indique la fecha.</p>
+              <p class="field-error"><span data-i18n="Indique la fecha.">Indique la fecha.</span></p>
             </div>
             <div class="field" data-required>
-              <label for="horaAcc">Hora <span class="req" aria-hidden="true">*</span></label>
+              <label for="horaAcc"><span data-i18n="Hora">Hora</span> <span class="req" aria-hidden="true">*</span></label>
               <input id="horaAcc" name="horaAcc" type="time" required>
-              <p class="field-error">Indique la hora.</p>
+              <p class="field-error"><span data-i18n="Indique la hora.">Indique la hora.</span></p>
             </div>
             <div class="field">
-              <span class="label">Día de la semana</span>
+              <span class="label"><span data-i18n="Día de la semana">Día de la semana</span></span>
               <output class="readonly" id="weekdayOut" aria-live="polite">—</output>
             </div>
 
             <div class="field full" data-required>
-              <span class="label" id="lbl-tipoAcc">Tipo de accidente <span class="req" aria-hidden="true">*</span></span>
+              <span class="label" id="lbl-tipoAcc"><span data-i18n="Tipo de accidente">Tipo de accidente</span> <span class="req" aria-hidden="true">*</span></span>
               <div class="seg" role="radiogroup" aria-labelledby="lbl-tipoAcc">
-                <label><input type="radio" name="tipoAcc" value="1" required><span>De trayecto <b>1</b></span></label>
-                <label><input type="radio" name="tipoAcc" value="2"><span>En la escuela <b>2</b></span></label>
+                <label><input type="radio" name="tipoAcc" value="1" required><span><span data-i18n="De trayecto">De trayecto</span> <b>1</b></span></label>
+                <label><input type="radio" name="tipoAcc" value="2"><span><span data-i18n="En la escuela">En la escuela</span> <b>2</b></span></label>
               </div>
-              <p class="field-error">Seleccione el tipo de accidente.</p>
+              <p class="field-error"><span data-i18n="Seleccione el tipo de accidente.">Seleccione el tipo de accidente.</span></p>
             </div>
           </div>
 
           <fieldset class="witnesses" id="witnesses">
-            <legend>Testigos <span class="legend-note">(en caso de trayecto)</span></legend>
+            <legend><span data-i18n="Testigos">Testigos</span> <span class="legend-note"><span data-i18n="(en caso de trayecto)">(en caso de trayecto)</span></span></legend>
             <div class="grid">
               <div class="field span-2">
-                <label for="t1Nombre">a) Nombre y apellido</label>
+                <label for="t1Nombre"><span data-i18n="a) Nombre y apellido">a) Nombre y apellido</span></label>
                 <input id="t1Nombre" name="t1Nombre" type="text" maxlength="50" autocapitalize="words">
               </div>
               <div class="field">
-                <label for="t1Ci">a) C. nac. de identidad</label>
+                <label for="t1Ci"><span data-i18n="a) C. nac. de identidad">a) C. nac. de identidad</span></label>
                 <input id="t1Ci" name="t1Ci" type="text" maxlength="12" placeholder="12.345.678-9" data-run autocapitalize="characters" spellcheck="false">
               </div>
               <div class="field span-2">
-                <label for="t2Nombre">b) Nombre y apellido</label>
+                <label for="t2Nombre"><span data-i18n="b) Nombre y apellido">b) Nombre y apellido</span></label>
                 <input id="t2Nombre" name="t2Nombre" type="text" maxlength="50" autocapitalize="words">
               </div>
               <div class="field">
-                <label for="t2Ci">b) C. nac. de identidad</label>
+                <label for="t2Ci"><span data-i18n="b) C. nac. de identidad">b) C. nac. de identidad</span></label>
                 <input id="t2Ci" name="t2Ci" type="text" maxlength="12" placeholder="12.345.678-9" data-run autocapitalize="characters" spellcheck="false">
               </div>
             </div>
@@ -287,52 +289,52 @@
           <header class="card-head">
             <span class="card-badge" aria-hidden="true">✎</span>
             <div>
-              <h2 id="sec-e-title">Circunstancia del accidente y firma</h2>
-              <p class="card-desc">Describa cómo ocurrió y la causa. La firma del rector o representante es opcional: puede firmar en pantalla o hacerlo a mano después de imprimir.</p>
+              <h2 id="sec-e-title"><span data-i18n="Circunstancia del accidente y firma">Circunstancia del accidente y firma</span></h2>
+              <p class="card-desc"><span data-i18n="Describa cómo ocurrió y la causa. La firma del rector o representante es opcional: puede firmar en pantalla o hacerlo a mano después de imprimir.">Describa cómo ocurrió y la causa. La firma del rector o representante es opcional: puede firmar en pantalla o hacerlo a mano después de imprimir.</span></p>
             </div>
           </header>
 
           <div class="grid">
             <div class="field full" data-required>
-              <label for="circunstancia">Circunstancia del accidente (cómo ocurrió y causa) <span class="req" aria-hidden="true">*</span></label>
-              <textarea id="circunstancia" name="circunstancia" rows="5" maxlength="700" placeholder="Ej: Durante el recreo, el alumno corría en el patio y tropezó con un desnivel, cayendo sobre su brazo izquierdo…" required></textarea>
+              <label for="circunstancia"><span data-i18n="Circunstancia del accidente (cómo ocurrió y causa)">Circunstancia del accidente (cómo ocurrió y causa)</span> <span class="req" aria-hidden="true">*</span></label>
+              <textarea id="circunstancia" name="circunstancia" rows="5" maxlength="700" placeholder="Ej: Durante el recreo, el alumno corría en el patio y tropezó con un desnivel, cayendo sobre su brazo izquierdo…" data-i18n-placeholder="Ej: Durante el recreo, el alumno corría en el patio y tropezó con un desnivel, cayendo sobre su brazo izquierdo…" required></textarea>
               <div class="meter">
                 <span id="circCount">0 / 700</span>
                 <span class="fit-badge" id="circFit" hidden></span>
               </div>
-              <p class="field-error">Describa la circunstancia del accidente.</p>
+              <p class="field-error"><span data-i18n="Describa la circunstancia del accidente.">Describa la circunstancia del accidente.</span></p>
             </div>
 
             <div class="field span-2">
-              <span class="label" id="lbl-firma">Firma y timbre · rector o representante</span>
+              <span class="label" id="lbl-firma"><span data-i18n="Firma y timbre · rector o representante">Firma y timbre · rector o representante</span></span>
               <div class="sig" id="sigWrap">
                 <canvas id="sigCanvas" aria-labelledby="lbl-firma" role="img"></canvas>
-                <p class="sig-placeholder" id="sigPlaceholder">Firme aquí con el dedo, lápiz o mouse</p>
+                <p class="sig-placeholder" id="sigPlaceholder"><span data-i18n="Firme aquí con el dedo, lápiz o mouse">Firme aquí con el dedo, lápiz o mouse</span></p>
                 <span class="sig-line" aria-hidden="true"></span>
               </div>
               <div class="sig-tools">
                 <button type="button" class="btn btn-small btn-secondary" id="sigUpload">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5m0 0L7.5 9.5M12 5l4.5 4.5M5 19h14"/></svg>
-                  Subir imagen
+                  <span data-i18n="Subir imagen">Subir imagen</span>
                 </button>
                 <button type="button" class="btn btn-small btn-ghost" id="sigClear">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
-                  Borrar firma
+                  <span data-i18n="Borrar firma">Borrar firma</span>
                 </button>
                 <input type="file" id="sigFile" accept="image/png,image/jpeg" hidden>
               </div>
-              <p class="hint">Puede subir una imagen escaneada de la firma y el timbre (el fondo blanco se quita automáticamente).</p>
+              <p class="hint"><span data-i18n="Puede subir una imagen escaneada de la firma y el timbre (el fondo blanco se quita automáticamente).">Puede subir una imagen escaneada de la firma y el timbre (el fondo blanco se quita automáticamente).</span></p>
             </div>
             <div class="field">
-              <label for="rectorNombre">Nombre del rector o representante</label>
-              <input id="rectorNombre" name="rectorNombre" type="text" maxlength="50" placeholder="Opcional" autocapitalize="words">
+              <label for="rectorNombre"><span data-i18n="Nombre del rector o representante">Nombre del rector o representante</span></label>
+              <input id="rectorNombre" name="rectorNombre" type="text" maxlength="50" placeholder="Opcional" data-i18n-placeholder="Opcional" autocapitalize="words">
             </div>
             <div class="field full">
               <label class="check">
                 <input type="checkbox" id="keepSignature" checked>
-                <span>Mantener la firma y el nombre del representante al crear un nuevo formulario</span>
+                <span><span data-i18n="Mantener la firma y el nombre del representante al crear un nuevo formulario">Mantener la firma y el nombre del representante al crear un nuevo formulario</span></span>
               </label>
-              <p class="hint">Desmarque si prefiere que esta sección quede en blanco en cada formulario nuevo.</p>
+              <p class="hint"><span data-i18n="Desmarque si prefiere que esta sección quede en blanco en cada formulario nuevo.">Desmarque si prefiere que esta sección quede en blanco en cada formulario nuevo.</span></p>
             </div>
           </div>
         </section>
@@ -343,8 +345,8 @@
             <summary>
               <span class="card-badge" aria-hidden="true">D</span>
               <span class="summary-text">
-                <span class="summary-title" id="sec-d-title">Naturaleza y consecuencia del accidente</span>
-                <span class="card-desc">Solo para el establecimiento asistencial. Normalmente se deja en blanco.</span>
+                <span class="summary-title" id="sec-d-title"><span data-i18n="Naturaleza y consecuencia del accidente">Naturaleza y consecuencia del accidente</span></span>
+                <span class="card-desc"><span data-i18n="Solo para el establecimiento asistencial. Normalmente se deja en blanco.">Solo para el establecimiento asistencial. Normalmente se deja en blanco.</span></span>
               </span>
               <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </summary>
@@ -352,75 +354,76 @@
             <div class="details-body">
               <div class="grid">
                 <div class="field span-2">
-                  <label for="asisNombre">Establecimiento asistencial</label>
-                  <input id="asisNombre" name="asisNombre" type="text" maxlength="60" placeholder="Ej: Hospital de Puerto Montt">
+                  <label for="asisNombre"><span data-i18n="Establecimiento asistencial">Establecimiento asistencial</span></label>
+                  <input id="asisNombre" name="asisNombre" type="text" maxlength="60" placeholder="Ej: Hospital de Puerto Montt" data-i18n-placeholder="Ej: Hospital de Puerto Montt">
                 </div>
                 <div class="field">
-                  <span class="label" id="lbl-codigo">Código (S.S. – establec.)</span>
+                  <span class="label" id="lbl-codigo"><span data-i18n="Código (S.S. – establec.)">Código (S.S. – establec.)</span></span>
                   <div class="code-pair" role="group" aria-labelledby="lbl-codigo">
-                    <input id="asisSS" name="asisSS" type="text" inputmode="numeric" maxlength="2" data-digits placeholder="SS" aria-label="Código servicio de salud">
+                    <input id="asisSS" name="asisSS" type="text" inputmode="numeric" maxlength="2" data-digits placeholder="SS" aria-label="Código servicio de salud" data-i18n-aria-label="Código servicio de salud">
                     <span aria-hidden="true">–</span>
-                    <input id="asisEst" name="asisEst" type="text" inputmode="numeric" maxlength="3" data-digits placeholder="Est." aria-label="Código establecimiento">
+                    <input id="asisEst" name="asisEst" type="text" inputmode="numeric" maxlength="3" data-digits placeholder="Est." aria-label="Código establecimiento" data-i18n-aria-label="Código establecimiento">
                   </div>
                 </div>
 
                 <div class="field span-2">
-                  <label for="diagnostico">Diagnóstico médico</label>
+                  <label for="diagnostico"><span data-i18n="Diagnóstico médico">Diagnóstico médico</span></label>
                   <input id="diagnostico" name="diagnostico" type="text" maxlength="120">
                 </div>
                 <div class="field">
-                  <label for="parteCuerpo">Parte del cuerpo afectada</label>
+                  <label for="parteCuerpo"><span data-i18n="Parte del cuerpo afectada">Parte del cuerpo afectada</span></label>
                   <input id="parteCuerpo" name="parteCuerpo" type="text" maxlength="40">
                 </div>
 
                 <div class="field">
-                  <span class="label" id="lbl-hosp">Hospitalización</span>
+                  <span class="label" id="lbl-hosp"><span data-i18n="Hospitalización">Hospitalización</span></span>
                   <div class="seg" role="radiogroup" aria-labelledby="lbl-hosp">
-                    <label><input type="radio" name="hosp" value="1"><span>Sí <b>1</b></span></label>
-                    <label><input type="radio" name="hosp" value="2"><span>No <b>2</b></span></label>
+                    <label><input type="radio" name="hosp" value="1"><span><span data-i18n="Sí">Sí</span> <b>1</b></span></label>
+                    <label><input type="radio" name="hosp" value="2"><span><span data-i18n="No">No</span> <b>2</b></span></label>
                   </div>
                 </div>
                 <div class="field">
-                  <label for="diasHosp">Total días hospitalización</label>
+                  <label for="diasHosp"><span data-i18n="Total días hospitalización">Total días hospitalización</span></label>
                   <input id="diasHosp" name="diasHosp" type="text" inputmode="numeric" maxlength="3" data-digits>
                 </div>
                 <div class="field">
-                  <span class="label" id="lbl-incap">Incapacidad</span>
+                  <span class="label" id="lbl-incap"><span data-i18n="Incapacidad">Incapacidad</span></span>
                   <div class="seg" role="radiogroup" aria-labelledby="lbl-incap">
-                    <label><input type="radio" name="incap" value="1"><span>Sí <b>1</b></span></label>
-                    <label><input type="radio" name="incap" value="2"><span>No <b>2</b></span></label>
+                    <label><input type="radio" name="incap" value="1"><span><span data-i18n="Sí">Sí</span> <b>1</b></span></label>
+                    <label><input type="radio" name="incap" value="2"><span><span data-i18n="No">No</span> <b>2</b></span></label>
                   </div>
                 </div>
                 <div class="field">
-                  <label for="diasIncap">Total días incapacidad</label>
+                  <label for="diasIncap"><span data-i18n="Total días incapacidad">Total días incapacidad</span></label>
                   <input id="diasIncap" name="diasIncap" type="text" inputmode="numeric" maxlength="3" data-digits>
                 </div>
 
                 <div class="field">
-                  <label for="tipoIncap">Tipo de incapacidad</label>
+                  <label for="tipoIncap"><span data-i18n="Tipo de incapacidad">Tipo de incapacidad</span></label>
                   <select id="tipoIncap" name="tipoIncap">
                     <option value="">—</option>
-                    <option value="1">1 · Leve</option>
-                    <option value="2">2 · Temporal</option>
-                    <option value="3">3 · Invalidez parcial</option>
-                    <option value="4">4 · Invalidez total</option>
-                    <option value="5">5 · Gran invalidez</option>
-                    <option value="6">6 · Muerte</option>
+                    <option value="1" data-i18n="1 · Leve">1 · Leve</option>
+                    <option value="2" data-i18n="2 · Temporal">2 · Temporal</option>
+                    <option value="3" data-i18n="3 · Invalidez parcial">3 · Invalidez parcial</option>
+                    <option value="4" data-i18n="4 · Invalidez total">4 · Invalidez total</option>
+                    <option value="5" data-i18n="5 · Gran invalidez">5 · Gran invalidez</option>
+                    <option value="6" data-i18n="6 · Muerte">6 · Muerte</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="causaCierre">Causa de cierre del caso</label>
+                  <label for="causaCierre"><span data-i18n="Causa de cierre del caso">Causa de cierre del caso</span></label>
                   <select id="causaCierre" name="causaCierre">
                     <option value="">—</option>
-                    <option value="1">1 · Alta médica</option>
-                    <option value="2">2 · Invalidez</option>
-                    <option value="3">3 · Abandono de tratamiento</option>
-                    <option value="4">4 · Muerte</option>
+                    <option value="1" data-i18n="1 · Alta médica">1 · Alta médica</option>
+                    <option value="2" data-i18n="2 · Invalidez">2 · Invalidez</option>
+                    <option value="3" data-i18n="3 · Abandono de tratamiento">3 · Abandono de tratamiento</option>
+                    <option value="4" data-i18n="4 · Muerte">4 · Muerte</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="fechaCierre">Fecha de cierre del caso</label>
+                  <label for="fechaCierre"><span data-i18n="Fecha de cierre del caso">Fecha de cierre del caso</span></label>
                   <input id="fechaCierre" name="fechaCierre" type="date">
+              <p class="field-error" id="fechaCierreError"></p>
                 </div>
               </div>
             </div>
@@ -437,44 +440,45 @@
           <option value="Jornada mañana"><option value="Jornada tarde"><option value="Jornada completa">
         </datalist>
       </form>
+      <button type="button" class="btn btn-ghost" data-action="clear-local"><span data-i18n="Borrar todos los datos locales">Borrar todos los datos locales</span></button>
     </main>
 
     <!-- Vista previa en vivo (solo monitores) -->
-    <aside class="preview" aria-label="Vista previa del PDF">
+    <aside class="preview" aria-label="Vista previa del PDF" data-i18n-aria-label="Vista previa del PDF">
       <div class="preview-head">
         <div>
-          <h2>Vista previa</h2>
-          <p id="previewState">Se actualiza mientras escribe</p>
+          <h2><span data-i18n="Vista previa">Vista previa</span></h2>
+          <p id="previewState"><span data-i18n="Se actualiza mientras escribe">Se actualiza mientras escribe</span></p>
         </div>
         <label class="switch">
           <input type="checkbox" id="livePreview" checked>
           <span class="switch-track" aria-hidden="true"></span>
-          <span>En vivo</span>
+          <span><span data-i18n="En vivo">En vivo</span></span>
         </label>
       </div>
       <div class="preview-frame" id="previewFrame">
-        <iframe title="Vista previa del PDF (A)" tabindex="-1"></iframe>
-        <iframe title="Vista previa del PDF (B)" tabindex="-1"></iframe>
-        <p class="preview-empty" id="previewEmpty" hidden>La vista previa está pausada.<br>Use «Vista previa» o «Descargar PDF».</p>
+        <iframe title="Vista previa del PDF (A)" data-i18n-title="Vista previa del PDF (A)" tabindex="-1"></iframe>
+        <iframe title="Vista previa del PDF (B)" data-i18n-title="Vista previa del PDF (B)" tabindex="-1"></iframe>
+        <p class="preview-empty" id="previewEmpty" hidden><span data-i18n="La vista previa está pausada.">La vista previa está pausada.</span><br><span data-i18n="Use «Vista previa» o «Descargar PDF».">Use «Vista previa» o «Descargar PDF».</span></p>
       </div>
     </aside>
   </div>
 
   <!-- Barra inferior de acciones (teléfono y tableta) -->
-  <div class="action-bar" role="toolbar" aria-label="Acciones">
-    <button type="button" class="btn btn-ghost btn-icon" data-action="reset" aria-label="Nuevo formulario" title="Nuevo formulario">
+  <div class="action-bar" role="toolbar" aria-label="Acciones" data-i18n-aria-label="Acciones">
+    <button type="button" class="btn btn-ghost btn-icon" data-action="reset" aria-label="Nuevo formulario" data-i18n-aria-label="Nuevo formulario" title="Nuevo formulario" data-i18n-title="Nuevo formulario">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
     </button>
-    <button type="button" class="btn btn-ghost btn-icon" data-action="students" aria-label="Carga masiva de estudiantes" title="Carga masiva de estudiantes">
+    <button type="button" class="btn btn-ghost btn-icon" data-action="students" aria-label="Carga masiva de estudiantes" data-i18n-aria-label="Carga masiva de estudiantes" title="Carga masiva de estudiantes" data-i18n-title="Carga masiva de estudiantes">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 20v-1.5A3.5 3.5 0 0 0 12 15H7a3.5 3.5 0 0 0-3.5 3.5V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20.5 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>
     </button>
     <button type="button" class="btn btn-secondary only-preview-tab" data-action="preview">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
-      Vista previa
+      <span data-i18n="Vista previa">Vista previa</span>
     </button>
     <button type="button" class="btn btn-primary" data-action="download">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
-      Descargar PDF
+      <span data-i18n="Descargar PDF">Descargar PDF</span>
     </button>
   </div>
 
@@ -494,10 +498,10 @@
     <div class="stu">
       <header class="stu-head">
         <div>
-          <h2 id="stuTitle">Carga masiva de estudiantes</h2>
-          <p class="card-desc">Cargue un Excel con los datos de los alumnos. Después, al ingresar el RUN en el formulario, los datos del estudiante se completan solos.</p>
+          <h2 id="stuTitle"><span data-i18n="Carga masiva de estudiantes">Carga masiva de estudiantes</span></h2>
+          <p class="card-desc"><span data-i18n="Cargue un Excel con los datos de los alumnos. Después, al ingresar el RUN en el formulario, los datos del estudiante se completan solos.">Cargue un Excel con los datos de los alumnos. Después, al ingresar el RUN en el formulario, los datos del estudiante se completan solos.</span></p>
         </div>
-        <button type="button" class="btn btn-ghost btn-icon" id="stuClose" aria-label="Cerrar">
+        <button type="button" class="btn btn-ghost btn-icon" id="stuClose" aria-label="Cerrar" data-i18n-aria-label="Cerrar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </header>
@@ -506,23 +510,23 @@
         <li class="stu-step">
           <span class="card-badge" aria-hidden="true">1</span>
           <div class="stu-step-body">
-            <h3>Descargue la plantilla</h3>
-            <p class="hint">Tabla con listas desplegables para Sexo, Curso, Horario, Comuna y Provincia. La hoja «Instrucciones» explica cada columna.</p>
+            <h3><span data-i18n="Descargue la plantilla">Descargue la plantilla</span></h3>
+            <p class="hint"><span data-i18n="Tabla con listas desplegables para Sexo, Curso, Horario, Comuna y Provincia. La hoja «Instrucciones» explica cada columna.">Tabla con listas desplegables para Sexo, Curso, Horario, Comuna y Provincia. La hoja «Instrucciones» explica cada columna.</span></p>
             <a class="btn btn-secondary btn-small" href="plantillas/Plantilla_Estudiantes.xlsx" download="Plantilla_Estudiantes.xlsx">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
-              Descargar plantilla
+              <span data-i18n="Descargar plantilla">Descargar plantilla</span>
             </a>
           </div>
         </li>
         <li class="stu-step">
           <span class="card-badge" aria-hidden="true">2</span>
           <div class="stu-step-body">
-            <h3>Cargue el Excel con los estudiantes</h3>
+            <h3><span data-i18n="Cargue el Excel con los estudiantes">Cargue el Excel con los estudiantes</span></h3>
             <div class="dropzone" id="stuDrop">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13l2 2.5L9 18m6-5-2 2.5 2 2.5"/></svg>
-              <p><strong>Arrastre el archivo aquí</strong> o</p>
-              <button type="button" class="btn btn-primary btn-small" id="stuPick">Seleccionar archivo</button>
-              <p class="hint">Formatos .xlsx, .xls o .csv · un archivo nuevo reemplaza la base actual</p>
+              <p><strong><span data-i18n="Arrastre el archivo aquí">Arrastre el archivo aquí</span></strong> <span data-i18n="o">o</span></p>
+              <button type="button" class="btn btn-primary btn-small" id="stuPick"><span data-i18n="Seleccionar archivo">Seleccionar archivo</span></button>
+              <p class="hint"><span data-i18n="Formatos .xlsx, .xls o .csv · un archivo nuevo reemplaza la base actual">Formatos .xlsx, .xls o .csv · un archivo nuevo reemplaza la base actual</span></p>
               <input type="file" id="stuFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden>
             </div>
             <div class="stu-result" id="stuResult" role="status" aria-live="polite" hidden></div>
@@ -530,27 +534,27 @@
         </li>
       </ol>
 
-      <p class="stu-empty" id="stuEmpty">Aún no hay estudiantes cargados. El autocompletado por RUN se activa al cargar un Excel.</p>
+      <p class="stu-empty" id="stuEmpty"><span data-i18n="Aún no hay estudiantes cargados. El autocompletado por RUN se activa al cargar un Excel.">Aún no hay estudiantes cargados. El autocompletado por RUN se activa al cargar un Excel.</span></p>
 
       <section class="stu-base" id="stuBase" aria-labelledby="stuBaseTitle" hidden>
         <div class="stu-base-head">
           <div>
-            <h3 id="stuBaseTitle">Base de estudiantes cargada</h3>
+            <h3 id="stuBaseTitle"><span data-i18n="Base de estudiantes cargada">Base de estudiantes cargada</span></h3>
             <p class="hint" id="stuMeta"></p>
           </div>
-          <button type="button" class="btn btn-ghost btn-small" id="stuDelete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg> Eliminar base</button>
+          <button type="button" class="btn btn-ghost btn-small" id="stuDelete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg> <span id="stuDeleteLabel">Eliminar base</span></button>
         </div>
-        <input type="text" id="stuSearch" placeholder="Buscar por RUN, nombre o curso" aria-label="Buscar estudiante" autocomplete="off" spellcheck="false">
+        <input type="text" id="stuSearch" placeholder="Buscar por RUN, nombre o curso" data-i18n-placeholder="Buscar por RUN, nombre o curso" aria-label="Buscar estudiante" data-i18n-aria-label="Buscar estudiante" autocomplete="off" spellcheck="false">
         <div class="stu-table-wrap">
           <table class="stu-table">
-            <thead><tr><th scope="col">RUN</th><th scope="col">Estudiante</th><th scope="col">Curso</th></tr></thead>
+            <thead><tr><th scope="col">RUN</th><th scope="col"><span data-i18n="Estudiante">Estudiante</span></th><th scope="col"><span data-i18n="Curso">Curso</span></th></tr></thead>
             <tbody id="stuRows"></tbody>
           </table>
         </div>
         <p class="hint" id="stuTableNote"></p>
       </section>
 
-      <p class="side-note">La base queda guardada solo en este navegador y no se envía a internet.</p>
+      <p class="side-note"><span data-i18n="La base queda guardada solo en este navegador y no se envía a internet.">La base queda guardada solo en este navegador y no se envía a internet.</span></p>
     </div>
   </dialog>
 

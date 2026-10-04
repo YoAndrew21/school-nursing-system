@@ -8,7 +8,9 @@
   'use strict';
 
   // Translation helper. Falls back to the original Spanish string if i18n is unavailable.
-  const tr = (text) => window.I18N?.t?.(text) ?? text;
+  const tr = (text, params) => window.I18N?.t?.(text, params) ?? text;
+  const message = (key, params = {}) => ({ key, params });
+  const translate = value => typeof value === 'string' ? tr(value) : tr(value.key, value.params);
 
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -38,6 +40,8 @@
   ];
 
   let db = loadDb();
+  // Prevent an import started before privacy erasure from restoring erased data.
+  let clearGeneration = 0;
   const listeners = [];
 
   /* ---------- utilidades ---------- */
@@ -195,7 +199,7 @@
       const rawRun = text(row[map.find((m) => m.col === COLUMNS[0]).i]);
       const run = cleanRun(rawRun);
       if (!run) return errors.push({ row: rowNum, msg: 'falta el RUN' });
-      if (!validRun(run)) return errors.push({ row: rowNum, msg: `RUN inválido («${rawRun}»)` });
+      if (!validRun(run)) return errors.push({ row: rowNum, msg: 'RUN inválido («{run}»)', params: { run: rawRun } });
       if (!rec.apPaterno && !rec.nombres) return errors.push({ row: rowNum, msg: 'faltan el apellido y los nombres' });
 
       rec.run = formatRun(run);
@@ -215,18 +219,26 @@
   const search = $('#stuSearch');
   const deleteBtn = $('#stuDelete');
 
+  let resultContent = null;
   function showResult(kind, title, details = []) {
+    resultContent = { kind, title, details };
+    renderResult();
+  }
+
+  function renderResult() {
+    if (!resultContent) return;
+    const { kind, title, details } = resultContent;
     result.hidden = false;
     result.className = `stu-result is-${kind}`;
     result.replaceChildren();
     const strong = document.createElement('strong');
-    strong.textContent = title;
+    strong.textContent = typeof title === 'function' ? title() : translate(title);
     result.appendChild(strong);
     if (details.length) {
       const ul = document.createElement('ul');
       details.forEach((d) => {
         const li = document.createElement('li');
-        li.textContent = d;
+        li.textContent = typeof d === 'function' ? d() : translate(d);
         ul.appendChild(li);
       });
       result.appendChild(ul);
@@ -246,7 +258,7 @@
     if (!db) return;
 
     const list = Object.values(db.students);
-    $('#stuMeta').textContent = `${list.length} estudiantes · «${db.fileName}» · cargado el ${formatStamp(db.loadedAt)}`;
+    $('#stuMeta').textContent = tr('{count} estudiantes · «{file}» · cargado el {time}', { count: list.length, file: db.fileName, time: formatStamp(db.loadedAt) });
 
     const q = norm(search.value);
     const matches = list
@@ -267,68 +279,72 @@
 
     const note = $('#stuTableNote');
     if (!matches.length) note.textContent = tr('Sin resultados para la búsqueda.');
-    else if (matches.length > TABLE_LIMIT) note.textContent = `Mostrando ${TABLE_LIMIT} de ${matches.length}. Use la búsqueda para encontrar a un estudiante.`;
+    else if (matches.length > TABLE_LIMIT) note.textContent = tr('Mostrando {limit} de {count}. Use la búsqueda para encontrar a un estudiante.', { limit: TABLE_LIMIT, count: matches.length });
     else note.textContent = '';
   }
 
   async function handleFile(file) {
     if (!file) return;
+    const generation = clearGeneration;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      showResult('bad', tr('Formato no admitido'), ['Use un archivo .xlsx, .xls o .csv (puede partir de la plantilla).']);
+      showResult('bad', 'Formato no admitido', ['Use un archivo .xlsx, .xls o .csv (puede partir de la plantilla).']);
       return;
     }
-    showResult('busy', `Leyendo «${file.name}»…`);
+    showResult('busy', message('Leyendo «{file}»…', { file: file.name }));
 
     let parsed;
     try {
       const X = await loadXlsx();
-      parsed = parseWorkbook(X, await file.arrayBuffer());
+      const buffer = await file.arrayBuffer();
+      if (generation !== clearGeneration) return;
+      parsed = parseWorkbook(X, buffer);
     } catch (e) {
-      showResult('bad', tr('No se pudo leer el archivo'), [e.userMessage || 'Verifique que sea un Excel válido y que no esté protegido con contraseña.']);
+      if (generation !== clearGeneration) return;
+      showResult('bad', 'No se pudo leer el archivo', [e.userMessage || 'Verifique que sea un Excel válido y que no esté protegido con contraseña.']);
       return;
     }
 
     const details = [];
-    if (parsed.duplicates) details.push(`${parsed.duplicates} RUN repetido(s): se usó la última fila.`);
-    parsed.errors.slice(0, MAX_ERRORS_SHOWN).forEach((e) => details.push(`Fila ${e.row}: ${e.msg}.`));
-    if (parsed.errors.length > MAX_ERRORS_SHOWN) details.push(`… y ${parsed.errors.length - MAX_ERRORS_SHOWN} fila(s) más con errores.`);
+    if (parsed.duplicates) details.push(message('{count} RUN repetido(s): se usó la última fila.', { count: parsed.duplicates }));
+    parsed.errors.slice(0, MAX_ERRORS_SHOWN).forEach(e => details.push(() => tr('Fila {row}: {message}.', { row: e.row, message: tr(e.msg, e.params) })));
+    if (parsed.errors.length > MAX_ERRORS_SHOWN) details.push(message('… y {count} fila(s) más con errores.', { count: parsed.errors.length - MAX_ERRORS_SHOWN }));
 
     const count = Object.keys(parsed.students).length;
     if (!count) {
-      showResult('bad', tr('No se cargó ningún estudiante'), details.length ? details : ['La hoja no tiene filas con datos bajo los encabezados.']);
+      showResult('bad', 'No se cargó ningún estudiante', details.length ? details : ['La hoja no tiene filas con datos bajo los encabezados.']);
       return;
     }
 
     try {
       saveDb({ fileName: file.name, loadedAt: Date.now(), students: parsed.students });
     } catch (e) {
-      showResult('bad', tr('No se pudo guardar la base'), [e.userMessage]);
+      showResult('bad', 'No se pudo guardar la base', [e.userMessage]);
       return;
     }
 
     search.value = '';
     renderBase();
-    const skipped = parsed.errors.length ? ` · ${parsed.errors.length} fila(s) omitida(s)` : '';
-    showResult(parsed.errors.length ? 'warn' : 'ok', `${count} estudiantes cargados${skipped}`, details);
+    const title = () => tr('{count} estudiantes cargados', { count }) + (parsed.errors.length ? tr(' · {count} fila(s) omitida(s)', { count: parsed.errors.length }) : '');
+    showResult(parsed.errors.length ? 'warn' : 'ok', title, details);
   }
 
   let deleteTimer;
   function resetDelete() {
     clearTimeout(deleteTimer);
     deleteBtn.classList.remove('is-confirm');
-    deleteBtn.lastChild.textContent = ' Eliminar base';
+    $('#stuDeleteLabel').textContent = tr('Eliminar base');
   }
 
   deleteBtn.addEventListener('click', () => {
     if (!deleteBtn.classList.contains('is-confirm')) {
       deleteBtn.classList.add('is-confirm');
-      deleteBtn.lastChild.textContent = ' ¿Eliminar? Confirmar';
+      $('#stuDeleteLabel').textContent = tr('¿Eliminar? Confirmar');
       deleteTimer = setTimeout(resetDelete, 4000);
       return;
     }
     saveDb(null);
     renderBase();
-    showResult('ok', tr('Base de estudiantes eliminada'), ['El autocompletado por RUN queda desactivado hasta cargar otro Excel.']);
+    showResult('ok', 'Base de estudiantes eliminada', ['El autocompletado por RUN queda desactivado hasta cargar otro Excel.']);
   });
 
   $('#stuPick').addEventListener('click', () => fileInput.click());
@@ -351,7 +367,16 @@
   });
 
   search.addEventListener('input', renderBase);
-  document.addEventListener('languagechange', renderBase);
+  document.addEventListener('languagechange', () => {
+    const confirming = deleteBtn.classList.contains('is-confirm');
+    renderBase();
+    if (confirming) {
+      deleteBtn.classList.add('is-confirm');
+      $('#stuDeleteLabel').textContent = tr('¿Eliminar? Confirmar');
+      deleteTimer = setTimeout(resetDelete, 4000);
+    }
+    if (!result.hidden) renderResult();
+  });
   $('#stuClose').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog.close();
@@ -360,6 +385,21 @@
   /* ---------- interfaz pública ---------- */
 
   window.DAEStudents = {
+    clearLocalData() {
+      clearGeneration++;
+      db = null;
+      search.value = '';
+      fileInput.value = '';
+      resultContent = null;
+      result.replaceChildren();
+      result.hidden = true;
+      $('#stuRows').replaceChildren();
+      $('#stuMeta').textContent = '';
+      $('#stuTableNote').textContent = '';
+      renderBase();
+      listeners.forEach(fn => fn());
+      localStorage.removeItem(STORAGE_KEY);
+    },
     open() {
       result.hidden = true;
       search.value = '';

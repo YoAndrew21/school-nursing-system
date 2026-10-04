@@ -33,20 +33,110 @@
     "Formato no admitido":"未対応の形式です", "No se pudo leer el archivo":"ファイルを読み込めませんでした", "No se cargó ningún estudiante":"児童・生徒データを取り込めませんでした",
     "No se pudo guardar la base":"データを保存できませんでした", "Base de estudiantes eliminada":"児童・生徒データを削除しました", "Sin resultados para la búsqueda.":"検索結果がありません。"
   });
-  const attrs = ['placeholder', 'aria-label', 'title'];
-  let current = localStorage.getItem(STORAGE_KEY) || 'es';
-  if (!['es','en','ja'].includes(current)) current = 'es';
-  const originalText = new WeakMap(); const originalAttr = new WeakMap();
-  function translateText(value) { const key=value.trim(); if (!key || current==='es') return value; const hit=dictionaries[current][key]; if (!hit) return value; return value.replace(key, hit); }
-  function translateNode(node) {
-    if (node.nodeType===Node.TEXT_NODE) { if (!originalText.has(node)) originalText.set(node,node.nodeValue); node.nodeValue=translateText(originalText.get(node)); return; }
-    if (node.nodeType!==Node.ELEMENT_NODE) return;
-    let saved=originalAttr.get(node); if(!saved){saved={}; attrs.forEach(a=>{if(node.hasAttribute(a)) saved[a]=node.getAttribute(a)}); originalAttr.set(node,saved)}
-    Object.entries(saved).forEach(([a,v])=>node.setAttribute(a, translateText(v)));
-    node.childNodes.forEach(translateNode);
+  // Spanish source keys are shared by marked HTML and explicit dynamic renderers.
+  const messages = [
+    ['Guardado {time}', 'Saved {time}', '保存済み {time}'],
+    ['Borrador guardado en este navegador', 'Draft saved in this browser', 'このブラウザに下書きを保存しました'],
+    ['Sin guardado local', 'Local saving unavailable', 'ローカル保存を利用できません'],
+    ['El navegador no permite guardar el borrador', 'The browser cannot save the draft', 'このブラウザでは下書きを保存できません'],
+    ['Guardando…', 'Saving…', '保存中…'],
+    ['Borrador recuperado', 'Draft restored', '下書きを復元しました'],
+    ['{done} de {total}', '{done} of {total}', '{total}項目中{done}項目'],
+    ['{day} · código {code}', '{day} · code {code}', '{day} · コード {code}'],
+    ['Lunes', 'Monday', '月曜日'], ['Martes', 'Tuesday', '火曜日'],
+    ['Miércoles', 'Wednesday', '水曜日'], ['Jueves', 'Thursday', '木曜日'],
+    ['Viernes', 'Friday', '金曜日'], ['Sábado', 'Saturday', '土曜日'], ['Domingo', 'Sunday', '日曜日'],
+    ['Año de nacimiento en el PDF: {year}', 'Birth year in the PDF: {year}', 'PDFに記載する出生年：{year}'],
+    ['Cabe en tamaño normal', 'Fits at normal size', '通常の文字サイズで収まります'],
+    ['Se imprimirá con letra reducida ({size} pt)', 'Will print at reduced size ({size} pt)', '縮小した文字サイズ（{size} pt）で印字されます'],
+    ['Demasiado largo: se recortará en el PDF', 'Too long: will be truncated in the PDF', '長すぎるため、PDFでは一部が省略されます'],
+    ['Base de {count} estudiantes: al ingresar el RUN se completan sus datos.', 'Database of {count} students: enter a RUN to auto-fill their data.', '{count}名の児童・生徒データがあります。RUNを入力すると情報を自動入力します。'],
+    ['Datos de {name} cargados desde la base de estudiantes.', 'Data for {name} loaded from the student database.', '{name}の情報を児童・生徒データから読み込みました。'],
+    ['Este navegador no puede mostrar el PDF dentro de la página. Use «Descargar PDF» para revisarlo.', 'This browser cannot display the PDF on this page. Use “Download PDF” to review it.', 'このブラウザではページ内にPDFを表示できません。「PDFをダウンロード」で確認してください。'],
+    ['El navegador bloqueó la ventana emergente. Use «Descargar PDF».', 'The browser blocked the pop-up. Use “Download PDF”.', 'ポップアップがブロックされました。「PDFをダウンロード」を使用してください。'],
+    ['Complete estos campos antes de generar la declaración:', 'Complete these fields before generating the declaration:', '申告書を作成する前に、次の項目を入力・修正してください：'],
+    ['R.U.N. del alumno (válido)', 'Student RUN (valid)', '児童・生徒のRUN（有効な番号）'],
+    ['Hora del accidente', 'Accident time', '事故発生時刻'],
+    ['Circunstancia del accidente', 'Accident circumstances', '事故の状況'],
+    ['¿Comenzar un formulario nuevo?', 'Start a new form?', '新規フォームを作成しますか？'],
+    ['Se borrarán los datos del alumno y del accidente.', 'Student and accident information will be cleared.', '児童・生徒情報と事故情報を消去します。'],
+    ['Se conservan los datos del establecimiento, la firma y el nombre del representante.', 'School information, signature and representative name will be kept.', '学校情報、署名、代表者名は保持されます。'],
+    ['Se conservan los datos del establecimiento. La firma y el nombre del representante también se borrarán.', 'School information will be kept. The signature and representative name will also be cleared.', '学校情報は保持されます。署名と代表者名は消去します。'],
+    ['Si aún no descargó el PDF actual, hágalo antes de continuar.', 'Download the current PDF before continuing if you have not already.', '現在のPDFをまだダウンロードしていない場合は、先にダウンロードしてください。'],
+    ['Ingrese una fecha válida.', 'Enter a valid calendar date.', '実在する日付を入力してください。'],
+    ['La fecha del accidente no puede ser futura.', 'The accident date cannot be in the future.', '事故発生日に未来の日付は指定できません。'],
+    ['La fecha de nacimiento no puede ser futura.', 'The birth date cannot be in the future.', '生年月日に未来の日付は指定できません。'],
+    ['La fecha de nacimiento no puede ser posterior al accidente.', 'The birth date cannot be after the accident date.', '生年月日は事故発生日以前の日付にしてください。'],
+    ['Corregir fechas', 'Correct dates', '日付を修正'],
+    ['Hay fechas inválidas', 'Invalid dates', '日付に誤りがあります'],
+    ['Borrar todos los datos locales', 'Clear all local data', 'すべてのローカルデータを消去'],
+    ['¿Borrar todos los datos locales?', 'Clear all local data?', 'すべてのローカルデータを消去しますか？'],
+    ['Se eliminarán los borradores, la base de estudiantes, la información médica y las firmas guardadas en este navegador, además de las preferencias locales. El formulario actual se vaciará. Esta acción no se puede deshacer. Los archivos descargados no se eliminan.', 'Drafts, the student database, medical information, signatures stored in this browser and local preferences will be removed. The current form will be cleared. This cannot be undone. Downloaded files will not be deleted.', 'このブラウザに保存された下書き、児童・生徒データ、医療情報、署名、ローカル設定を削除し、現在のフォームを空にします。この操作は取り消せません。ダウンロード済みのファイルは削除されません。'],
+    ['Datos locales eliminados.', 'Local data cleared.', 'ローカルデータを消去しました。'],
+    ['No se pudieron eliminar todos los datos guardados. El navegador impide acceder al almacenamiento. No se puede confirmar la eliminación; revise los datos del sitio en la configuración del navegador.', 'Some stored data could not be removed because the browser blocks storage access. Deletion cannot be confirmed; check site data in browser settings.', 'ブラウザがストレージへのアクセスを制限しているため、保存データをすべて削除できませんでした。削除を確認できないため、ブラウザ設定のサイトデータを確認してください。'],
+    ['{count} estudiantes · «{file}» · cargado el {time}', '{count} students · “{file}” · imported {time}', '{count}名 · 「{file}」 · 取込日時：{time}'],
+    ['Mostrando {limit} de {count}. Use la búsqueda para encontrar a un estudiante.', 'Showing {limit} of {count}. Use search to find a student.', '{count}名中{limit}名を表示しています。検索で児童・生徒を探してください。'],
+    ['Use un archivo .xlsx, .xls o .csv (puede partir de la plantilla).', 'Use an .xlsx, .xls or .csv file (you can use the template).', '.xlsx、.xls、.csvのいずれかを使用してください（テンプレートも利用できます）。'],
+    ['Leyendo «{file}»…', 'Reading “{file}”…', '「{file}」を読み込み中…'],
+    ['Verifique que sea un Excel válido y que no esté protegido con contraseña.', 'Check that the spreadsheet is valid and not password protected.', '有効な表計算ファイルで、パスワード保護されていないことを確認してください。'],
+    ['{count} RUN repetido(s): se usó la última fila.', '{count} duplicate RUN(s): the last row was used.', 'RUNの重複が{count}件あります。最後の行を使用しました。'],
+    ['Fila {row}: {message}.', 'Row {row}: {message}.', '{row}行目：{message}。'],
+    ['… y {count} fila(s) más con errores.', '… and {count} more row(s) with errors.', 'ほかに{count}行のエラーがあります。'],
+    ['La hoja no tiene filas con datos bajo los encabezados.', 'The sheet has no data rows below the headers.', '見出しの下にデータ行がありません。'],
+    ['{count} estudiantes cargados', '{count} students imported', '{count}名のデータを取り込みました'],
+    [' · {count} fila(s) omitida(s)', ' · {count} row(s) skipped', ' · {count}行をスキップしました'],
+    ['¿Eliminar? Confirmar', 'Delete? Confirm', '削除を確定'],
+    ['El autocompletado por RUN queda desactivado hasta cargar otro Excel.', 'RUN auto-fill is disabled until another spreadsheet is imported.', '別の表計算ファイルを取り込むまで、RUNによる自動入力は無効になります。'],
+    ['El navegador no tiene espacio suficiente o no permite guardar datos. Pruebe con un archivo más pequeño.', 'The browser has insufficient space or cannot save data. Try a smaller file.', 'ブラウザの保存容量が不足しているか、保存が許可されていません。小さいファイルでお試しください。'],
+    ['No se pudo cargar el lector de Excel. Recargue la página e intente de nuevo.', 'The spreadsheet reader could not load. Reload the page and try again.', '表計算ファイルの読込機能を起動できませんでした。ページを再読み込みしてお試しください。'],
+    ['El archivo no tiene datos.', 'The file has no data.', 'ファイルにデータがありません。'],
+    ['No se encontró la columna «RUN». Use la plantilla y no cambie los nombres de las columnas.', 'The “RUN” column was not found. Use the template without changing column names.', '「RUN」列が見つかりません。テンプレートの列名を変更せずに使用してください。'],
+    ['falta el RUN', 'RUN is missing', 'RUNが未入力です'],
+    ['RUN inválido («{run}»)', 'Invalid RUN (“{run}”)', 'RUNが無効です（「{run}」）'],
+    ['faltan el apellido y los nombres', 'surname and given names are missing', '姓と名が未入力です'],
+    ['Secciones y acciones', 'Sections and actions', 'セクションと操作'],
+    ['Secciones del formulario', 'Form sections', 'フォームのセクション'],
+    ['Vista previa del PDF', 'PDF preview', 'PDFプレビュー'],
+    ['Vista previa del PDF (A)', 'PDF preview (A)', 'PDFプレビュー（A）'],
+    ['Vista previa del PDF (B)', 'PDF preview (B)', 'PDFプレビュー（B）'],
+    ['Acciones', 'Actions', '操作'], ['Cerrar', 'Close', '閉じる'],
+    ['Versión {version}', 'Version {version}', 'バージョン {version}'],
+  ];
+  messages.forEach(([es, en, ja]) => { dictionaries.en[es] = en; dictionaries.ja[es] = ja; });
+  let current = 'es';
+  try { current = localStorage.getItem(STORAGE_KEY) || 'es'; } catch (_) { /* Use in-memory language. */ }
+  if (!['es', 'en', 'ja'].includes(current)) current = 'es';
+
+  function t(key, params = {}) {
+    const template = current === 'es' ? key : (dictionaries[current][key] || key);
+    return template.replace(/\{(\w+)\}/g, (match, name) => Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match);
   }
-  function apply(lang=current){ current=lang; localStorage.setItem(STORAGE_KEY,current); document.documentElement.lang=current==='es'?'es-CL':current; document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('is-active',b.dataset.lang===current)); translateNode(document.body); document.dispatchEvent(new CustomEvent('languagechange',{detail:{language:current}})); }
-  function t(es){ return current==='es' ? es : (dictionaries[current][es] || es); }
-  window.I18N={t,apply,get language(){return current;}};
-  document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>apply(b.dataset.lang))); apply(current); const obs=new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(translateNode))); obs.observe(document.body,{childList:true,subtree:true}); });
+
+  function render(root = document) {
+    root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    ['placeholder', 'aria-label', 'title'].forEach(attr => {
+      root.querySelectorAll(`[data-i18n-${attr}]`).forEach(el => {
+        el.setAttribute(attr, t(el.getAttribute(`data-i18n-${attr}`)));
+      });
+    });
+  }
+
+  function apply(lang = current) {
+    if (!['es', 'en', 'ja'].includes(lang)) return;
+    current = lang;
+    try { localStorage.setItem(STORAGE_KEY, current); } catch (_) { /* Keep selection in memory. */ }
+    document.documentElement.lang = current === 'es' ? 'es-CL' : current;
+    document.querySelectorAll('[data-lang]').forEach(button => {
+      const selected = button.dataset.lang === current;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    render();
+    document.dispatchEvent(new CustomEvent('languagechange', { detail: { language: current } }));
+  }
+  window.I18N = { t, apply, render, get language() { return current; } };
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-lang]').forEach(button => button.addEventListener('click', () => apply(button.dataset.lang)));
+    apply(current);
+  });
 })();

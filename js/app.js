@@ -6,7 +6,7 @@
   'use strict';
 
   // Translation helper. Falls back to the original Spanish string if i18n is unavailable.
-  const tr = (text) => window.I18N?.t?.(text) ?? text;
+  const tr = (text, params) => window.I18N?.t?.(text, params) ?? text;
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -68,6 +68,7 @@
       clearTimeout(t);
       fn();
     };
+    wrapped.cancel = () => clearTimeout(t);
     return wrapped;
   }
 
@@ -100,9 +101,9 @@
   }
 
   function computeAge(birth, ref) {
-    const b = DAE.parseDate(birth);
-    if (!b) return '';
-    const r = DAE.parseDate(ref) || DAE.parseDate(todayISO());
+    const b = parseCalendarDate(birth);
+    const r = parseCalendarDate(ref || todayISO());
+    if (!b || !r || birth > todayISO() || (ref && ref > todayISO()) || birth > (ref || todayISO())) return '';
     let age = Number(r.y) - Number(b.y);
     if (Number(r.m) < Number(b.m) || (Number(r.m) === Number(b.m) && Number(r.d) < Number(b.d))) age--;
     return age >= 0 && age < 100 ? String(age) : '';
@@ -149,6 +150,14 @@
 
   const saveStatus = $('#saveStatus');
   const saveText = $('.save-text', saveStatus);
+  let saveMessage = 'Borrador local';
+  let saveParams = {};
+  let saveTitle = '';
+  let localDataCleared = false;
+  function renderSaveStatus() {
+    saveText.textContent = tr(saveMessage, saveParams);
+    saveStatus.title = tr(saveTitle);
+  }
 
   function loadSaved() {
     try {
@@ -160,25 +169,60 @@
   }
 
   const save = debounce(() => {
+    if (localDataCleared) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign(getData(), { schema: DRAFT_SCHEMA })));
       const t = new Date();
-      saveText.textContent = `Guardado ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-      saveStatus.title = 'Borrador guardado en este navegador';
+      saveMessage = 'Guardado {time}';
+      saveParams = { time: `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` };
+      saveTitle = 'Borrador guardado en este navegador';
     } catch (e) {
-      saveText.textContent = 'Sin guardado local';
-      saveStatus.title = 'El navegador no permite guardar el borrador';
+      saveMessage = 'Sin guardado local';
+      saveTitle = 'El navegador no permite guardar el borrador';
     }
     saveStatus.classList.remove('is-saving');
+    renderSaveStatus();
   }, 500);
 
   function markDirty() {
+    if (localDataCleared) return;
     saveStatus.classList.add('is-saving');
-    saveText.textContent = 'Guardando…';
+    saveMessage = 'Guardando…';
+    renderSaveStatus();
     save();
   }
 
   /* ---------- validación y progreso ---------- */
+
+  // Validate calendar components without JavaScript Date rollover or timezone conversion.
+  function parseCalendarDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (!match) return null;
+    const [y, m, d] = match.slice(1).map(Number);
+    if (y < 1 || m < 1 || m > 12) return null;
+    const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return d >= 1 && d <= days[m - 1] ? { y, m, d } : null;
+  }
+
+  const DATE_FIELDS = [
+    { name: 'fechaRegistro', label: 'Fecha de registro de los datos', section: 'sec-a' },
+    { name: 'fechaNac', label: 'Fecha de nacimiento', section: 'sec-b' },
+    { name: 'fechaAcc', label: 'Fecha del accidente', section: 'sec-c' },
+    { name: 'fechaCierre', label: 'Fecha de cierre del caso', section: 'sec-d' },
+  ];
+
+  function dateError(name, data) {
+    if (!DATE_FIELDS.some(field => field.name === name)) return '';
+    const el = form.elements.namedItem(name);
+    const value = data[name];
+    if (el?.validity?.badInput || (value && !parseCalendarDate(value))) return 'Ingrese una fecha válida.';
+    if (!value) return '';
+    if (name === 'fechaAcc' && value > todayISO()) return 'La fecha del accidente no puede ser futura.';
+    if (name === 'fechaNac' && value > todayISO()) return 'La fecha de nacimiento no puede ser futura.';
+    if (name === 'fechaNac' && parseCalendarDate(data.fechaAcc) && value > data.fechaAcc) return 'La fecha de nacimiento no puede ser posterior al accidente.';
+    return '';
+  }
 
   function isFilled(req, data) {
     const v = String(data[req.name] || '').trim();
@@ -196,33 +240,59 @@
     const perSection = {};
 
     REQUIRED.forEach((req) => {
-      const ok = isFilled(req, data);
+      const ok = isFilled(req, data) && !dateError(req.name, data);
       if (ok) done++;
       perSection[req.section] = (perSection[req.section] !== false) && ok;
       const field = fieldEl(req.name);
-      if (field) field.classList.toggle('is-invalid', !ok && (showAllErrors || touched.has(req.name)));
+      if (field) setFieldValidation(req.name, field, !ok && (showAllErrors || touched.has(req.name)));
     });
 
-    $('#progressText').textContent = `${done} de ${REQUIRED.length}`;
+    const invalidDates = DATE_FIELDS.filter(req => dateError(req.name, data));
+    DATE_FIELDS.forEach(req => {
+      const field = fieldEl(req.name);
+      const message = dateError(req.name, data);
+      const error = field.querySelector('.field-error');
+      if (req.name === 'fechaAcc') error.textContent = tr(message || 'Indique la fecha.');
+      else error.textContent = tr(message);
+      const showError = showAllErrors || touched.has(req.name);
+      setFieldValidation(req.name, field, showError && (!!message || (req.name === 'fechaAcc' && !data.fechaAcc)));
+      if (message) perSection[req.section] = false;
+    });
+
+    $('#progressText').textContent = tr('{done} de {total}', { done, total: REQUIRED.length });
     $('#progressBar').style.width = `${(done / REQUIRED.length) * 100}%`;
-    $('.progress-box').classList.toggle('is-complete', done === REQUIRED.length);
+    $('.progress-box').classList.toggle('is-complete', done === REQUIRED.length && !invalidDates.length);
 
     $$('.steps a').forEach((a) => {
       const id = a.dataset.step;
       a.classList.toggle('is-done', id in perSection && perSection[id]);
     });
 
-    return REQUIRED.filter((req) => !isFilled(req, data));
+    const missing = REQUIRED.filter(req => !isFilled(req, data));
+    return missing.concat(invalidDates.filter(req => !missing.some(item => item.name === req.name)));
+  }
+
+  function setFieldValidation(name, field, invalid) {
+    field.classList.toggle('is-invalid', !!invalid);
+    const error = field.querySelector('.field-error');
+    if (error) error.id = `${name}Error`;
+    $$(`[name="${name}"]`, form).forEach(input => {
+      input.setAttribute('aria-invalid', String(!!invalid));
+      const ids = new Set((input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+      if (error) ids.add(error.id);
+      field.querySelectorAll('.hint[id]').forEach(hint => ids.add(hint.id));
+      if (ids.size) input.setAttribute('aria-describedby', [...ids].join(' '));
+    });
   }
 
   /* ---------- campos derivados ---------- */
 
   function renderDerived(data) {
-    const wd = DAE.weekdayIndex(data.fechaAcc);
-    $('#weekdayOut').textContent = wd ? `${DIAS[Number(wd) - 1]} · código ${wd}` : '—';
+    const wd = parseCalendarDate(data.fechaAcc) ? DAE.weekdayIndex(data.fechaAcc) : '';
+    $('#weekdayOut').textContent = wd ? tr('{day} · código {code}', { day: tr(DIAS[Number(wd) - 1]), code: wd }) : '—';
 
-    const nac = DAE.parseDate(data.fechaNac);
-    $('#anioNacHint').textContent = nac ? `Año de nacimiento en el PDF: ${nac.y}` : 'En el PDF se imprime solo el año.';
+    const nac = parseCalendarDate(data.fechaNac);
+    $('#anioNacHint').textContent = nac ? tr('Año de nacimiento en el PDF: {year}', { year: nac.y }) : tr('En el PDF se imprime solo el año.');
 
     $('#witnesses').classList.toggle('is-highlight', data.tipoAcc === '1');
   }
@@ -245,12 +315,12 @@
     badge.hidden = false;
     badge.className = 'fit-badge';
     if (fit.mode === 'normal') {
-      badge.textContent = 'Cabe en tamaño normal';
+      badge.textContent = tr('Cabe en tamaño normal');
     } else if (fit.mode === 'reducido') {
-      badge.textContent = `Se imprimirá con letra reducida (${fit.size} pt)`;
+      badge.textContent = tr('Se imprimirá con letra reducida ({size} pt)', { size: fit.size });
       badge.classList.add('is-warn');
     } else {
-      badge.textContent = 'Demasiado largo: se recortará en el PDF';
+      badge.textContent = tr('Demasiado largo: se recortará en el PDF');
       badge.classList.add('is-bad');
     }
   }, 150);
@@ -266,6 +336,7 @@
   }
 
   form.addEventListener('input', (e) => {
+    localDataCleared = false;
     const el = e.target;
     if (el.matches('[data-digits]')) {
       const clean = el.value.replace(/\D/g, '');
@@ -277,7 +348,7 @@
     }
     if (el.name === 'fechaNac' || el.name === 'fechaAcc') {
       const age = computeAge($('#fechaNac').value, $('#fechaAcc').value);
-      if (age) $('#edad').value = age;
+      $('#edad').value = age;
     }
     if (el.name === 'circunstancia') renderCircMeter();
     if (el.type === 'radio') touched.add(el.name);
@@ -317,7 +388,7 @@
     if (!info) msg = tr('Sin base de estudiantes: cargue un Excel para completar los datos con el RUN.');
     else if (state === 'found') msg = tr('✓ Datos completados desde la base de estudiantes.');
     else if (state === 'missing') msg = tr('RUN no encontrado en la base de estudiantes.');
-    else msg = window.I18N?.language === 'en' ? `Database of ${info.count} students: enter a RUN to auto-fill their data.` : window.I18N?.language === 'ja' ? `${info.count}名の児童・生徒データ：RUNを入力すると情報を自動入力します。` : `Base de ${info.count} estudiantes: al ingresar el RUN se completan sus datos.`;
+    else msg = tr('Base de {count} estudiantes: al ingresar el RUN se completan sus datos.', { count: info.count });
     $('#runLookupText').textContent = msg;
   }
 
@@ -350,7 +421,7 @@
     refresh();
     renderRunLookup();
     const name = [student.nombres, student.apPaterno].filter(Boolean).join(' ');
-    toast(`Datos de ${name || next.run} cargados desde la base de estudiantes.`);
+    toast('Datos de {name} cargados desde la base de estudiantes.', { name: name || next.run });
     return true;
   }
 
@@ -514,7 +585,7 @@
     function loadFile(file) {
       if (!file) return;
       if (!/^image\/(png|jpeg)$/.test(file.type)) {
-        toast(tr('Use una imagen PNG o JPG.'));
+        toast('Use una imagen PNG o JPG.');
         return;
       }
       const reader = new FileReader();
@@ -537,11 +608,11 @@
           }
           cx.putImageData(id, 0, 0);
           value = trimmed(c);
-          if (!value) toast(tr('La imagen parece estar en blanco.'));
+          if (!value) toast('La imagen parece estar en blanco.');
           paint();
           onChange(value);
         };
-        img.onerror = () => toast(tr('No se pudo leer la imagen.'));
+        img.onerror = () => toast('No se pudo leer la imagen.');
         img.src = reader.result;
       };
       reader.readAsDataURL(file);
@@ -575,16 +646,18 @@
     };
   })();
 
-  signature.onChange(() => refresh());
+  signature.onChange(() => { localDataCleared = false; refresh(); });
 
   /* ---------- PDF: vista previa y descarga ---------- */
 
   function buildDoc(data) {
+    const values = data || getData();
+    if (DATE_FIELDS.some(req => dateError(req.name, values))) return null;
     try {
-      return DAE.buildPdf(data || getData());
+      return DAE.buildPdf(values);
     } catch (e) {
       console.error(e);
-      toast(tr('No se pudo generar el PDF. Recargue la página e intente de nuevo.'));
+      toast('No se pudo generar el PDF. Recargue la página e intente de nuevo.');
       return null;
     }
   }
@@ -627,7 +700,7 @@
     function syncState() {
       if (!canEmbed) {
         empty.hidden = false;
-        empty.innerHTML = 'Este navegador no puede mostrar el PDF dentro de la página.<br>Use «Descargar PDF» para revisarlo.';
+        empty.textContent = tr('Este navegador no puede mostrar el PDF dentro de la página. Use «Descargar PDF» para revisarlo.');
         state.textContent = tr('No disponible');
         live.disabled = true;
         return;
@@ -644,6 +717,18 @@
 
     return {
       init: syncState,
+      clear() {
+        clearTimeout(timer);
+        frames.forEach((frame, i) => {
+          frame.onload = null;
+          frame.removeAttribute('src');
+          frame.classList.remove('is-front');
+          if (urls[i]) URL.revokeObjectURL(urls[i]);
+          urls[i] = null;
+        });
+        empty.hidden = false;
+        state.textContent = tr('En pausa');
+      },
       schedule() {
         if (!canEmbed || !live.checked || !mq.matches) return;
         clearTimeout(timer);
@@ -654,6 +739,12 @@
   })();
 
   function openPreview() {
+    if (DATE_FIELDS.some(req => dateError(req.name, getData()))) {
+      showAllErrors = true;
+      renderValidation(getData());
+      toast('Hay fechas inválidas');
+      return;
+    }
     const win = window.open('', '_blank');
     const doc = buildDoc();
     if (!doc) {
@@ -674,14 +765,14 @@
     showAllErrors = true;
     const missing = renderValidation(data);
     if (missing.length) {
-      const list = missing.map((m) => `<li>${m.label}</li>`).join('');
+      const hasInvalidDates = DATE_FIELDS.some(req => dateError(req.name, data));
       const choice = await ask({
-        title: tr('Faltan datos obligatorios'),
-        html: `<p>Complete estos campos antes de generar la declaración:</p><ul>${list}</ul>`,
-        primary: tr('Completar datos'),
-        secondary: tr('Descargar de todos modos'),
+        title: hasInvalidDates ? 'Hay fechas inválidas' : 'Faltan datos obligatorios',
+        html: () => `<p>${tr('Complete estos campos antes de generar la declaración:')}</p><ul>${missing.map(m => `<li>${tr(m.label)}${dateError(m.name, data) ? ': ' + tr(dateError(m.name, data)) : ''}</li>`).join('')}</ul>`,
+        primary: hasInvalidDates ? 'Corregir fechas' : 'Completar datos',
+        secondary: hasInvalidDates ? 'Cancelar' : 'Descargar de todos modos',
       });
-      if (choice !== 'secondary') {
+      if (hasInvalidDates || choice !== 'secondary') {
         if (choice === 'primary') focusField(missing[0].name);
         return;
       }
@@ -689,7 +780,7 @@
     const doc = buildDoc(data);
     if (!doc) return;
     doc.save(fileName(data));
-    toast(tr('PDF generado y descargado.'));
+    toast('PDF generado y descargado.');
   }
 
   function focusField(name) {
@@ -709,11 +800,12 @@
       : 'Se conservan los datos del establecimiento. La firma y el nombre del representante también se borrarán.';
     const choice = await ask({
       title: '¿Comenzar un formulario nuevo?',
-      html: `<p>Se borrarán los datos del alumno y del accidente. ${kept}</p><p class="dialog-note">Si aún no descargó el PDF actual, hágalo antes de continuar.</p>`,
+      html: () => `<p>${tr('Se borrarán los datos del alumno y del accidente.')} ${tr(kept)}</p><p class="dialog-note">${tr('Si aún no descargó el PDF actual, hágalo antes de continuar.')}</p>`,
       primary: 'Nuevo formulario',
       secondary: 'Cancelar',
     });
     if (choice !== 'primary') return;
+    localDataCleared = false;
     const current = getData();
     const next = { firma: '' };
     Array.from(form.elements).forEach((el) => {
@@ -734,10 +826,56 @@
     refresh();
     save.flush();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    toast(tr('Formulario nuevo listo.'));
+    toast('Formulario nuevo listo.');
   }
 
-  document.addEventListener('languagechange', () => { renderRunLookup(); preview.init(); refresh(); });
+  async function clearLocalData() {
+    const choice = await ask({
+      title: '¿Borrar todos los datos locales?',
+      html: () => `<p>${tr('Se eliminarán los borradores, la base de estudiantes, la información médica y las firmas guardadas en este navegador, además de las preferencias locales. El formulario actual se vaciará. Esta acción no se puede deshacer. Los archivos descargados no se eliminan.')}</p>`,
+      primary: 'Borrar todos los datos locales', secondary: 'Cancelar',
+    });
+    if (choice !== 'primary') return;
+    // Cancel pending autosave before erasing; do not recreate the draft on focusout.
+    localDataCleared = true;
+    save.cancel();
+    let failed = false;
+    for (const key of [STORAGE_KEY, PREFS_KEY, 'school-nursing-language']) {
+      try { localStorage.removeItem(key); } catch (_) { failed = true; }
+    }
+    try { DAEStudents.clearLocalData(); } catch (_) { failed = true; }
+    const empty = { firma: '' };
+    Array.from(form.elements).forEach(el => { if (el.name) empty[el.name] = ''; });
+    setData(empty);
+    $('#keepSignature').checked = true;
+    touched.clear();
+    showAllErrors = false;
+    lookupRun = '';
+    lookupState = '';
+    $('#asisDetails').open = false;
+    renderDerived(getData());
+    renderValidation(getData());
+    renderCircMeter.flush();
+    renderRunLookup();
+    preview.clear();
+    saveStatus.classList.remove('is-saving');
+    saveMessage = failed ? 'Sin guardado local' : 'Datos locales eliminados.';
+    saveTitle = '';
+    renderSaveStatus();
+    toast(failed ? 'No se pudieron eliminar todos los datos guardados. El navegador impide acceder al almacenamiento. No se puede confirmar la eliminación; revise los datos del sitio en la configuración del navegador.' : 'Datos locales eliminados.');
+  }
+
+  document.addEventListener('languagechange', () => {
+    renderRunLookup();
+    preview.init();
+    renderDerived(getData());
+    renderValidation(getData());
+    renderCircMeter.flush();
+    renderSaveStatus();
+    $('#appVersion').textContent = tr('Versión {version}', { version: '1.3.2' });
+    if (dialog.open && dialogContent) renderDialog();
+    if (!$('#toast').hidden) renderToast();
+  });
 
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
@@ -747,6 +885,7 @@
     else if (action === 'preview') openPreview();
     else if (action === 'reset') resetForm();
     else if (action === 'students') DAEStudents.open();
+    else if (action === 'clear-local') clearLocalData();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -759,12 +898,17 @@
   /* ---------- diálogo y avisos ---------- */
 
   const dialog = $('#dialog');
+  let dialogContent = null;
+  function renderDialog() {
+    $('#dialogTitle').textContent = tr(dialogContent.title);
+    $('#dialogBody').innerHTML = dialogContent.html();
+    $('#dialogOk').textContent = tr(dialogContent.primary);
+    $('#dialogCancel').textContent = tr(dialogContent.secondary);
+  }
 
   function ask({ title, html, primary, secondary }) {
-    $('#dialogTitle').textContent = title;
-    $('#dialogBody').innerHTML = html;
-    $('#dialogOk').textContent = primary;
-    $('#dialogCancel').textContent = secondary;
+    dialogContent = { title, html, primary, secondary };
+    renderDialog();
     dialog.returnValue = '';
     return new Promise((resolve) => {
       dialog.addEventListener(
@@ -778,9 +922,14 @@
   }
 
   let toastTimer;
-  function toast(msg) {
+  let toastMessage = '';
+  let toastParams = {};
+  function renderToast() { $('#toast').textContent = tr(toastMessage, toastParams); }
+  function toast(msg, params = {}) {
     const el = $('#toast');
-    el.textContent = msg;
+    toastMessage = msg;
+    toastParams = params;
+    renderToast();
     el.hidden = false;
     el.style.animation = 'none';
     void el.offsetWidth;
@@ -863,11 +1012,13 @@
       if (Object.keys(saved).some((k) => /^(asis|diag|parteCuerpo|hosp|diasHosp|incap|diasIncap|tipoIncap|causaCierre|fechaCierre)/.test(k) && saved[k])) {
         $('#asisDetails').open = true;
       }
-      saveText.textContent = 'Borrador recuperado';
+      saveMessage = 'Borrador recuperado';
+      renderSaveStatus();
     } else {
       setData(Object.assign({}, DEFAULTS, { fechaRegistro: today }));
     }
 
+    $('#edad').value = computeAge($('#fechaNac').value, $('#fechaAcc').value);
     const data = getData();
     renderDerived(data);
     renderValidation(data);
