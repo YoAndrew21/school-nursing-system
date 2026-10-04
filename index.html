@@ -80,7 +80,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
           <span data-i18n="Nuevo formulario">Nuevo formulario</span>
         </button>
-        <p class="side-note"><span data-i18n="Los datos se guardan solo en este navegador. Nada se envía a internet.">Los datos se guardan solo en este navegador. Nada se envía a internet.</span><br><span class="app-version" id="appVersion">Versión 1.3.2</span></p>
+        <p class="side-note"><span data-i18n="Los datos se guardan solo en este navegador. Nada se envía a internet.">Los datos se guardan solo en este navegador. Nada se envía a internet.</span><br><span class="app-version" id="appVersion">Versión 1.5.0</span></p>
       </div>
     </aside>
 
@@ -229,7 +229,8 @@
             </div>
             <div class="field">
               <label for="codifCom"><span data-i18n="Codif. comuna">Codif. comuna</span></label>
-              <input id="codifCom" name="codifCom" type="text" inputmode="numeric" maxlength="3" data-digits placeholder="3 dígitos" data-i18n-placeholder="3 dígitos">
+              <input id="codifCom" name="codifCom" type="text" inputmode="numeric" maxlength="1024" data-digits placeholder="Código numérico" data-i18n-placeholder="Código numérico" aria-describedby="codifComHint">
+              <p class="hint" id="codifComHint"><span data-i18n="El código se conserva completo. El PDF oficial dispone de 3 casillas y muestra solo los primeros 3 dígitos.">El código se conserva completo. El PDF oficial dispone de 3 casillas y muestra solo los primeros 3 dígitos.</span></p>
             </div>
           </div>
         </section>
@@ -535,10 +536,20 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13l2 2.5L9 18m6-5-2 2.5 2 2.5"/></svg>
               <p><strong><span data-i18n="Arrastre el archivo aquí">Arrastre el archivo aquí</span></strong> <span data-i18n="o">o</span></p>
               <button type="button" class="btn btn-primary btn-small" id="stuPick"><span data-i18n="Seleccionar archivo">Seleccionar archivo</span></button>
-              <p class="hint"><span data-i18n="Formatos .xlsx, .xls o .csv · un archivo nuevo reemplaza la base actual">Formatos .xlsx, .xls o .csv · un archivo nuevo reemplaza la base actual</span></p>
+              <p class="hint"><span data-i18n="Formatos .xlsx, .xls o .csv · revise la vista previa y confirme para reemplazar la base">Formatos .xlsx, .xls o .csv · revise la vista previa y confirme para reemplazar la base</span></p>
+              <p class="hint"><span data-i18n="Límites de seguridad de la aplicación: 5 MiB y 5000 filas de estudiantes.">Límites de seguridad de la aplicación: 5 MiB y 5000 filas de estudiantes.</span></p>
               <input type="file" id="stuFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden>
             </div>
             <div class="stu-result" id="stuResult" role="status" aria-live="polite" hidden></div>
+            <section class="stu-import-preview" id="stuPreview" aria-labelledby="stuPreviewTitle" hidden>
+              <h3 id="stuPreviewTitle" tabindex="-1"><span data-i18n="Vista previa de importación">Vista previa de importación</span></h3>
+              <ul id="stuPreviewStats"></ul>
+              <p class="hint" id="stuReplacement"></p>
+              <div class="dialog-actions">
+                <button type="button" class="btn btn-ghost" id="stuCancelImport"><span data-i18n="Cancelar">Cancelar</span></button>
+                <button type="button" class="btn btn-primary" id="stuConfirmImport" aria-describedby="stuReplacement" disabled><span data-i18n="Confirmar importación">Confirmar importación</span></button>
+              </div>
+            </section>
           </div>
         </li>
       </ol>
@@ -569,9 +580,11 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <script src="js/release.js"></script>
   <script src="js/i18n.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="js/pdf.js"></script>
+  <script src="js/student-import.js"></script>
   <script src="js/estudiantes.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -7,6 +7,34 @@ const crypto = require('node:crypto');
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 
+test('release workflow synchronizes future versions before hashing without editing historical tests', () => {
+  const writes = new Map();
+  const mockFs = {
+    readFileSync(file, encoding) {
+      const contents = writes.has(file) ? Buffer.from(writes.get(file)) : fs.readFileSync(file);
+      return encoding ? contents.toString(encoding) : contents;
+    },
+    writeFileSync(file, contents) { writes.set(file, contents); },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'tools/update-shell.cjs'), 'utf8'), {
+    Buffer, __dirname: path.join(root, 'tools'), process: { argv: ['node', 'update-shell.cjs', '9.9.9'] },
+    require(name) { return name === 'node:fs' ? mockFs : require(name); },
+  });
+  const release = {};
+  vm.runInNewContext(writes.get(path.join(root, 'js/release.js')), release);
+  assert.equal(release.AppRelease.version, '9.9.9');
+  assert.match(writes.get(path.join(root, 'index.html')), /id="appVersion">Versión 9\.9\.9/);
+  const worker = { self: { registration: { scope: 'https://example.test/' }, addEventListener() {} }, URL };
+  vm.runInNewContext(writes.get(path.join(root, 'sw.js')) + '\nglobalThis.metadata = { VERSION, INTEGRITY };', worker);
+  assert.equal(worker.metadata.VERSION, release.AppRelease.version);
+  for (const asset of ['./js/release.js', './index.html']) {
+    const bytes = Buffer.from(writes.get(path.join(root, asset)));
+    const hash = 'sha256-' + crypto.createHash('sha256').update(bytes).digest('base64');
+    assert.ok(worker.metadata.INTEGRITY[asset].split(' ').includes(hash));
+  }
+  assert.equal(writes.has(path.join(root, 'tests/sw.test.cjs')), false);
+});
+
 function setup() {
   const scope = 'https://example.test/school/';
   const handlers = {}, stores = new Map(), deleted = [], fetched = [], requests = [];
@@ -40,8 +68,13 @@ test('complete shell installs in its scoped release cache with matching hashes',
   const env = setup();
   await env.lifecycle('install');
   assert.ok(env.stores.has(env.CACHE));
-  assert.match(env.CACHE, /1\.4\.0$/);
-  assert.equal(env.requests.length, 16);
+  assert.ok(env.CACHE.endsWith(env.VERSION));
+  const release = {};
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'js/release.js'), 'utf8'), release);
+  assert.equal(env.VERSION, release.AppRelease.version);
+  assert.equal(env.requests.length, env.ASSETS.length);
+  assert.ok(env.ASSETS.includes('./js/student-import.js'));
+  assert.ok(env.ASSETS.includes('./js/student-import-worker.js'));
   for (const asset of env.ASSETS) {
     const contents = fs.readFileSync(path.join(root, asset === './' ? 'index.html' : asset));
     const hash = 'sha256-' + crypto.createHash('sha256').update(contents).digest('base64');

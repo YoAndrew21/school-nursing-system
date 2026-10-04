@@ -79,9 +79,9 @@ const COLUMNS = [
   { header: 'Comuna', width: 18, help: ['Opcional', 'Elija de la lista o escriba otra comuna.', 'Puerto Montt'], validation: openList('Comuna', 'Elija de la lista o escriba otra comuna') },
   { header: 'Provincia', width: 16, help: ['Opcional', 'Elija de la lista o escriba otra provincia.', 'Llanquihue'], validation: openList('Provincia', 'Elija de la lista o escriba otra provincia') },
   {
-    header: 'Codif. comuna', width: 15, numFmt: '0',
-    help: ['Opcional', 'Número de hasta 3 dígitos.', '101'],
-    validation: { type: 'whole', operator: 'between', formulae: [0, 999], errorStyle: 'stop', error: 'Ingrese un número de hasta 3 dígitos.', prompt: 'Hasta 3 dígitos' },
+    header: 'Codif. comuna', width: 15, numFmt: '@',
+    help: ['Opcional', 'Código numérico completo, como texto para conservar ceros. El PDF muestra solo los primeros 3 dígitos.', '10101'],
+    validation: { type: 'textLength', operator: 'between', formulae: [1, 1024], errorStyle: 'warning', error: 'Use un código numérico completo. La aplicación valida los dígitos sin recortar.', prompt: 'Código completo; use texto para conservar ceros.' },
   },
   {
     header: 'Tipo de identificación', width: 24,

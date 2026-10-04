@@ -1,8 +1,5 @@
-/*
- * Carga masiva de estudiantes: lectura del Excel y base guardada en el
- * navegador (localStorage) para completar el formulario a partir del RUN.
- * El lector de Excel se carga solo al abrir esta ventana. La plantilla con
- * formato es un archivo fijo (plantillas/), generado con tools/generar-plantilla.js.
+/* Local two-phase student import. Parsing runs in a disposable worker;
+ * only explicit confirmation writes the validated database to localStorage.
  */
 (function () {
   'use strict';
@@ -15,127 +12,25 @@
   const $ = (sel, root = document) => root.querySelector(sel);
 
   const STORAGE_KEY = 'dae-enfermeria:estudiantes:v1';
-  const XLSX_SRC = 'vendor/xlsx.full.min.js';
-  const SHEET_NAME = 'Estudiantes';
   const TABLE_LIMIT = 100;
   const MAX_ERRORS_SHOWN = 8;
 
-  // Columnas de la plantilla → campos del formulario (los encabezados se comparan
-  // sin tildes, mayúsculas ni símbolos: «RUN *» equivale a «RUN»)
-  const COLUMNS = [
-    { name: 'run', header: 'RUN', aliases: ['rut', 'run alumno', 'rut alumno', 'run estudiante', 'rut estudiante'] },
-    { name: 'identificationType', header: 'Tipo de identificación', aliases: ['tipo identificacion', 'identification type', 'identificationType'] },
-    { name: 'identificationValue', header: 'Identificación', aliases: ['identificador', 'identification', 'identification value', 'identificationValue'] },
-    { name: 'apPaterno', header: 'Apellido paterno', aliases: ['paterno', 'primer apellido'], max: 30 },
-    { name: 'apMaterno', header: 'Apellido materno', aliases: ['materno', 'segundo apellido'], max: 30 },
-    { name: 'nombres', header: 'Nombres', aliases: ['nombre', 'nombres alumno'], max: 40 },
-    { name: 'sexo', header: 'Sexo', aliases: ['genero'], parse: parseSexo },
-    { name: 'fechaNac', header: 'Fecha de nacimiento', aliases: ['fecha nacimiento', 'nacimiento', 'fecha nac'], parse: parseDate },
-    { name: 'curso', header: 'Curso', aliases: ['nivel', 'curso alumno'], max: 30 },
-    { name: 'horario', header: 'Horario', aliases: ['jornada'], max: 30 },
-    { name: 'calle', header: 'Calle', aliases: ['direccion', 'domicilio'], max: 50 },
-    { name: 'numero', header: 'Número', aliases: ['nro', 'n°', 'num', 'numero casa'], max: 10 },
-    { name: 'poblacion', header: 'Población / Villa', aliases: ['poblacion', 'villa', 'sector'], max: 40 },
-    { name: 'resComuna', header: 'Comuna', aliases: ['comuna residencia'], max: 30 },
-    { name: 'resProvincia', header: 'Provincia', aliases: ['provincia residencia'], max: 30 },
-    { name: 'codifCom', header: 'Codif. comuna', aliases: ['codigo comuna', 'cod comuna', 'codificacion comuna'], parse: (v) => text(v).replace(/\D/g, '').slice(0, 3) },
-  ];
+  const { validIpe, identificationKey, limits } = StudentImport;
 
   let db = loadDb();
   // Prevent an import started before privacy erasure from restoring erased data.
-  let clearGeneration = 0;
+  let importGeneration = 0;
+  let pendingImport = null;
+  let activeWorker = null;
   const listeners = [];
 
   /* ---------- utilidades ---------- */
 
-  function norm(v) {
-    return String(v == null ? '' : v)
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '');
-  }
-
-  function text(v) {
-    return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
-  }
-
-  function cleanRun(v) {
-    return String(v || '').replace(/[^0-9kK]/g, '').toUpperCase().replace(/^0+(?=\d)/, '');
-  }
-
-  function validRun(v) {
-    const c = cleanRun(v);
-    if (c.length < 2) return false;
-    const body = c.slice(0, -1);
-    if (!/^\d{1,8}$/.test(body)) return false;
-    let sum = 0;
-    let mul = 2;
-    for (let i = body.length - 1; i >= 0; i--) {
-      sum += Number(body[i]) * mul;
-      mul = mul === 7 ? 2 : mul + 1;
-    }
-    const r = 11 - (sum % 11);
-    return c.slice(-1) === (r === 11 ? '0' : r === 10 ? 'K' : String(r));
-  }
-
-  function formatRun(c) {
-    return c.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + c.slice(-1);
-  }
-
-  // This is an application input policy, not an official IPE format.
-  // Numeric input only; preserve leading zeroes and trim surrounding whitespace.
-  // The length cap is a technical bound, not an official IPE length rule.
-  const IPE_MAX_LENGTH = 30;
-  function validIpe(value) {
-    const id = String(value ?? '').trim();
-    return id.length >= 1 && id.length <= IPE_MAX_LENGTH && /^[0-9]+$/.test(id);
-  }
-
-  function parseIdentificationType(value) {
-    if (!String(value ?? '').trim()) return 'run';
-    const type = norm(value);
-    if (['run', 'rut', 'runchileno', 'chileanrun'].includes(type)) return 'run';
-    if (['provisional', 'ipe', 'provisionalipe', 'identificacionprovisional', 'identificacionprovisionalipe', 'provisionalidentification', 'identificadorprovisorioescolar', 'ipeidentificadorprovisorioescolar'].includes(type)) return 'ipe';
-    return '';
-  }
-
-  function identificationKey(type, value) {
-    if (type === 'run') return `run:${cleanRun(value)}`;
-    if (type === 'ipe') return `ipe:${String(value ?? '').trim()}`;
-    return '';
-  }
-
+  const norm = StudentImport.norm;
   function migrateStudent(record, legacyKey = '') {
     const identificationType = record.identificationType === 'provisional' ? 'ipe' : (record.identificationType || 'run');
     const identificationValue = String(record.identificationValue ?? record.run ?? legacyKey).trim();
     return { ...record, identificationType, identificationValue, run: identificationType === 'run' ? identificationValue : '' };
-  }
-
-  function parseSexo(v) {
-    const n = norm(v);
-    if (['1', 'm', 'masculino', 'hombre', 'h', 'varon'].includes(n)) return '1';
-    if (['2', 'f', 'femenino', 'mujer'].includes(n)) return '2';
-    return '';
-  }
-
-  function isoDate(y, m, d) {
-    const date = new Date(y, m - 1, d);
-    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return '';
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  }
-
-  function parseDate(v) {
-    if (typeof v === 'number' && window.XLSX) {
-      const p = XLSX.SSF.parse_date_code(v);
-      return p ? isoDate(p.y, p.m, p.d) : '';
-    }
-    const s = text(v);
-    let m = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/);
-    if (m) return isoDate(Number(m[3]), Number(m[2]), Number(m[1]));
-    m = s.match(/^(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})/);
-    if (m) return isoDate(Number(m[1]), Number(m[2]), Number(m[3]));
-    return '';
   }
 
   function userError(msg) {
@@ -172,101 +67,6 @@
     }
     db = data;
     listeners.forEach((fn) => fn());
-  }
-
-  /* ---------- lectura del Excel ---------- */
-
-  let xlsxPromise = null;
-  function loadXlsx() {
-    if (window.XLSX) return Promise.resolve(window.XLSX);
-    if (!xlsxPromise) {
-      xlsxPromise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = XLSX_SRC;
-        s.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('xlsx')));
-        s.onerror = () => {
-          xlsxPromise = null;
-          reject(userError('No se pudo cargar el lector de Excel. Recargue la página e intente de nuevo.'));
-        };
-        document.head.appendChild(s);
-      });
-    }
-    return xlsxPromise;
-  }
-
-  function columnFor(header) {
-    const h = norm(header);
-    if (!h) return null;
-    return COLUMNS.find((c) => norm(c.header) === h || c.aliases.some((a) => norm(a) === h)) || null;
-  }
-
-  function parseWorkbook(X, buffer, filename) {
-    // raw: no interpretar textos de CSV (evita fechas en formato de EE. UU.)
-    const options = { type: 'array', raw: true };
-    if (/\.csv$/i.test(filename)) {
-      // Keep legacy Windows-1252 CSV compatible while supporting accented UTF-8 headers.
-      try {
-        new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(buffer));
-        options.codepage = 65001;
-      } catch (_) { /* Use the reader's existing encoding fallback. */ }
-    }
-    const wb = X.read(buffer, options);
-    const sheetName = wb.SheetNames.find((n) => norm(n) === norm(SHEET_NAME)) || wb.SheetNames[0];
-    const ws = sheetName && wb.Sheets[sheetName];
-    if (!ws || !ws['!ref']) throw userError('El archivo no tiene datos.');
-
-    const firstRow = X.utils.decode_range(ws['!ref']).s.r + 1;
-    const rows = X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: true });
-
-    const headerIdx = rows.slice(0, 20).findIndex(row => row.some(cell => ['run', 'identificationValue'].includes(columnFor(cell)?.name)));
-    if (headerIdx < 0) throw userError('No se encontró una columna «RUN» o «Identificación». Use la plantilla.');
-
-    const map = [];
-    rows[headerIdx].forEach((cell, i) => {
-      const col = columnFor(cell);
-      if (col && !map.some((m) => m.col === col)) map.push({ col, i });
-    });
-
-    const students = {};
-    const errors = [];
-    let duplicates = 0;
-
-    rows.slice(headerIdx + 1).forEach((row, k) => {
-      if (!row.some((cell) => text(cell))) return;
-      const rowNum = firstRow + headerIdx + 1 + k;
-      const rec = {};
-      map.forEach(({ col, i }) => {
-        const v = row[i];
-        let out = col.parse ? col.parse(v) : ['run', 'identificationValue'].includes(col.name) ? String(v ?? '').trim() : text(v);
-        if (col.max) out = out.slice(0, col.max);
-        rec[col.name] = out;
-      });
-
-      const type = parseIdentificationType(rec.identificationType);
-      const rawId = rec.identificationValue || rec.run || '';
-      if (!type) return errors.push({ row: rowNum, msg: 'Tipo de identificación no reconocido; use RUN o IPE' });
-      if (rec.identificationValue && rec.run && (type === 'run' ? cleanRun(rec.identificationValue) !== cleanRun(rec.run) : rec.identificationValue !== rec.run)) {
-        return errors.push({ row: rowNum, msg: 'las columnas RUN e Identificación contienen valores distintos' });
-      }
-      if (type === 'run') {
-        const run = cleanRun(rawId);
-        if (!run) return errors.push({ row: rowNum, msg: 'falta el RUN' });
-        if (!validRun(run)) return errors.push({ row: rowNum, msg: 'RUN inválido («{run}»)', params: { run: rawId } });
-        rec.identificationValue = formatRun(run);
-      } else {
-        if (!validIpe(rawId)) return errors.push({ row: rowNum, msg: 'IPE inválido: ingrese entre 1 y 30 dígitos, sin puntos ni guion' });
-        rec.identificationValue = rawId.trim();
-      }
-      if (!rec.apPaterno && !rec.nombres) return errors.push({ row: rowNum, msg: 'faltan el apellido y los nombres' });
-
-      rec.identificationType = type;
-      rec.run = type === 'run' ? rec.identificationValue : '';
-      const key = identificationKey(type, rec.identificationValue);
-      if (students[key]) duplicates++;
-      students[key] = rec;
-    });
-
-    return { students, errors, duplicates };
   }
 
   /* ---------- ventana ---------- */
@@ -344,48 +144,131 @@
 
   async function handleFile(file) {
     if (!file) return;
-    const generation = clearGeneration;
+    cancelImport();
+    const generation = importGeneration;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
       showResult('bad', 'Formato no admitido', ['Use un archivo .xlsx, .xls o .csv (puede partir de la plantilla).']);
       return;
     }
+    if (file.size > limits.MAX_FILE_BYTES) {
+      showResult('bad', 'No se pudo leer el archivo', [message('El archivo supera el límite de {mb} MiB.', { mb: 5 })]);
+      return;
+    }
     showResult('busy', message('Leyendo «{file}»…', { file: file.name }));
+    $('#stuPreview').hidden = false;
+    $('#stuPreviewStats').replaceChildren();
+    $('#stuReplacement').textContent = '';
+    $('#stuConfirmImport').disabled = true;
+    result.setAttribute('aria-busy', 'true');
 
-    let parsed;
     try {
-      const X = await loadXlsx();
       const buffer = await file.arrayBuffer();
-      if (generation !== clearGeneration) return;
-      parsed = parseWorkbook(X, buffer, file.name);
+      if (generation !== importGeneration) return;
+      if (buffer.byteLength > limits.MAX_FILE_BYTES) throw userError(message('El archivo supera el límite de {mb} MiB.', { mb: 5 }));
+      const parsed = await parseInWorker(buffer, file.name);
+      if (generation !== importGeneration) return;
+      pendingImport = { generation, fileName: file.name, parsed };
+      result.setAttribute('aria-busy', 'false');
+      renderPreview();
+      showResult(parsed.errorRows ? 'warn' : 'ok', 'Archivo validado: revise antes de importar.', importDetails(parsed));
+      $('#stuPreviewTitle').focus();
     } catch (e) {
-      if (generation !== clearGeneration) return;
+      if (generation !== importGeneration) return;
+      $('#stuPreview').hidden = true;
+      result.setAttribute('aria-busy', 'false');
       showResult('bad', 'No se pudo leer el archivo', [e.userMessage || 'Verifique que sea un Excel válido y que no esté protegido con contraseña.']);
-      return;
     }
+  }
 
+  function importDetails(parsed) {
     const details = [];
-    if (parsed.duplicates) details.push(message('{count} identificación(es) repetida(s) del mismo tipo: se usó la última fila.', { count: parsed.duplicates }));
-    parsed.errors.slice(0, MAX_ERRORS_SHOWN).forEach(e => details.push(() => tr('Fila {row}: {message}.', { row: e.row, message: tr(e.msg, e.params) })));
-    if (parsed.errors.length > MAX_ERRORS_SHOWN) details.push(message('… y {count} fila(s) más con errores.', { count: parsed.errors.length - MAX_ERRORS_SHOWN }));
-
-    const count = Object.keys(parsed.students).length;
-    if (!count) {
-      showResult('bad', 'No se cargó ningún estudiante', details.length ? details : ['La hoja no tiene filas con datos bajo los encabezados.']);
-      return;
+    for (const [reports, key] of [[parsed.errors, 'Error · Fila {row}: {message}'], [parsed.warnings, 'Advertencia · Fila {row}: {message}']]) {
+      reports.slice(0, MAX_ERRORS_SHOWN).forEach(report => details.push(() => tr(key, {
+        row: report.row, message: tr(report.msg, { ...report.params, field: report.params?.field ? tr(report.params.field) : undefined }),
+      })));
+      if (reports.length > MAX_ERRORS_SHOWN) details.push(message('Hay {count} avisos adicionales; se muestran los primeros {limit} de cada tipo.', { count: reports.length - MAX_ERRORS_SHOWN, limit: MAX_ERRORS_SHOWN }));
     }
+    if (!parsed.count) details.push('No hay estudiantes válidos para importar.');
+    return details;
+  }
 
+  function renderPreview() {
+    if (!pendingImport) return;
+    const { fileName, parsed } = pendingImport;
+    const stats = $('#stuPreviewStats');
+    stats.replaceChildren();
+    [message('Archivo: {file}', { file: fileName }),
+      message('Filas detectadas: {count}', { count: parsed.totalRows }),
+      message('Estudiantes válidos: {count}', { count: parsed.count }),
+      message('Filas con errores: {count}', { count: parsed.errorRows }),
+      message('Filas con advertencias: {count}', { count: parsed.warningRows }),
+      message('RUN: {count}', { count: parsed.runCount }), message('IPE: {count}', { count: parsed.ipeCount })
+    ].forEach(value => { const li = document.createElement('li'); li.textContent = translate(value); stats.appendChild(li); });
+    $('#stuReplacement').textContent = tr(db
+      ? 'Al confirmar, se reemplazará la base actual. Las filas con errores se excluirán.'
+      : 'Al confirmar, se creará la base local. Las filas con errores se excluirán.');
+    $('#stuConfirmImport').disabled = !parsed.count;
+  }
+
+  function cancelImport() {
+    importGeneration++;
+    pendingImport = null;
+    if (activeWorker) activeWorker.cancel();
+    $('#stuPreview').hidden = true;
+    $('#stuPreviewStats').replaceChildren();
+    $('#stuReplacement').textContent = '';
+    $('#stuConfirmImport').disabled = true;
+    result.setAttribute('aria-busy', 'false');
+    resultContent = null;
+    result.replaceChildren();
+    result.hidden = true;
+  }
+
+  function parseInWorker(buffer, filename) {
+    return new Promise((resolve, reject) => {
+      if (!window.Worker) return reject(userError('Este navegador no permite el procesamiento local seguro de archivos.'));
+      let worker;
+      try { worker = new Worker('js/student-import-worker.js'); }
+      catch (_) { return reject(userError('No se pudo iniciar el lector local. Use HTTPS o localhost.')); }
+      let timer;
+      const finish = (callback, value) => {
+        clearTimeout(timer);
+        worker.terminate();
+        if (activeWorker?.worker === worker) activeWorker = null;
+        callback(value);
+      };
+      activeWorker = { worker, cancel: () => finish(reject, new Error('cancelled')) };
+      worker.onmessage = event => event.data.error
+        ? finish(reject, userError(event.data.error)) : finish(resolve, event.data.parsed);
+      worker.onerror = () => finish(reject, userError('No se pudo iniciar el lector local. Use HTTPS o localhost.'));
+      worker.onmessageerror = () => finish(reject, userError('No se pudo leer el archivo'));
+      timer = setTimeout(() => finish(reject, userError(message('La lectura superó {seconds} segundos. Use un archivo más pequeño.', { seconds: limits.MAX_PARSE_MS / 1000 }))), limits.MAX_PARSE_MS);
+      try { worker.postMessage({ buffer, filename }, [buffer]); }
+      catch (e) { finish(reject, e); }
+    });
+  }
+
+  $('#stuConfirmImport').addEventListener('click', () => {
+    if (!pendingImport || pendingImport.generation !== importGeneration || !pendingImport.parsed.count) return;
+    const { fileName, parsed } = pendingImport;
     try {
-      saveDb({ schema: 2, fileName: file.name, loadedAt: Date.now(), students: parsed.students });
+      saveDb({ schema: 2, fileName, loadedAt: Date.now(), students: parsed.students });
     } catch (e) {
       showResult('bad', 'No se pudo guardar la base', [e.userMessage]);
       return;
     }
-
+    const { count, errorRows } = parsed;
+    const details = importDetails(parsed);
+    cancelImport();
     search.value = '';
     renderBase();
-    const title = () => tr('{count} estudiantes cargados', { count }) + (parsed.errors.length ? tr(' · {count} fila(s) omitida(s)', { count: parsed.errors.length }) : '');
-    showResult(parsed.errors.length ? 'warn' : 'ok', title, details);
-  }
+    const title = () => tr('{count} estudiantes cargados', { count }) + (errorRows ? tr(' · {count} fila(s) omitida(s)', { count: errorRows }) : '');
+    showResult(errorRows ? 'warn' : 'ok', title, details);
+  });
+  $('#stuCancelImport').addEventListener('click', () => {
+    cancelImport();
+    showResult('ok', 'Importación cancelada. La base anterior no cambió.');
+  });
 
   let deleteTimer;
   function resetDelete() {
@@ -401,6 +284,7 @@
       deleteTimer = setTimeout(resetDelete, 4000);
       return;
     }
+    cancelImport();
     saveDb(null);
     renderBase();
     showResult('ok', 'Base de estudiantes eliminada', ['El autocompletado por identificación queda desactivado hasta cargar otro archivo.']);
@@ -435,8 +319,10 @@
       deleteTimer = setTimeout(resetDelete, 4000);
     }
     if (!result.hidden) renderResult();
+    renderPreview();
   });
   $('#stuClose').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', cancelImport);
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog.close();
   });
@@ -444,9 +330,9 @@
   /* ---------- interfaz pública ---------- */
 
   window.DAEStudents = {
-    identification: { validIpe, key: identificationKey, ipeMaxLength: IPE_MAX_LENGTH },
+    identification: { validIpe, key: identificationKey, ipeMaxLength: StudentImport.IPE_MAX_LENGTH },
     clearLocalData() {
-      clearGeneration++;
+      cancelImport();
       db = null;
       search.value = '';
       fileInput.value = '';
@@ -461,11 +347,11 @@
       localStorage.removeItem(STORAGE_KEY);
     },
     open() {
+      cancelImport();
       result.hidden = true;
       search.value = '';
       renderBase();
       dialog.showModal();
-      loadXlsx().catch(() => {});
     },
     info() {
       return db ? { count: Object.keys(db.students).length, fileName: db.fileName, loadedAt: db.loadedAt } : null;

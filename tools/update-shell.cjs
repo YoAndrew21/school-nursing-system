@@ -7,7 +7,18 @@ const filename = path.join(root, 'sw.js');
 let source = fs.readFileSync(filename, 'utf8');
 const version = process.argv[2];
 if (!/^\d+\.\d+\.\d+$/.test(version || '')) throw Error('Usage: node tools/update-shell.cjs NEW_VERSION');
-source = source.replace(/const VERSION = '[^']+';/, `const VERSION = '${version}';`);
+// Set the canonical release before deriving the shell and the no-JavaScript label.
+const releaseFile = path.join(root, 'js', 'release.js');
+const releaseSource = fs.readFileSync(releaseFile, 'utf8');
+if (!/version: '[^']+'/.test(releaseSource)) throw Error('Missing canonical release version');
+fs.writeFileSync(releaseFile, releaseSource.replace(/version: '[^']+'/, `version: '${version}'`));
+const canonicalVersion = fs.readFileSync(releaseFile, 'utf8').match(/version: '([^']+)'/)[1];
+const htmlFile = path.join(root, 'index.html');
+const html = fs.readFileSync(htmlFile, 'utf8');
+if (!/<span class="app-version" id="appVersion">[^<]*<\/span>/.test(html)) throw Error('Missing application version label');
+fs.writeFileSync(htmlFile, html.replace(/(<span class="app-version" id="appVersion">)[^<]*(<\/span>)/,
+  `$1Versión ${canonicalVersion}$2`));
+source = source.replace(/const VERSION = '[^']+';/, `const VERSION = '${canonicalVersion}';`);
 const list = source.match(/const ASSETS = (\[[\s\S]*?\]);/)[1];
 const assets = [...list.matchAll(/'([^']+)'/g)].map(match => match[1]);
 const hashes = Object.fromEntries(assets.map(asset => {

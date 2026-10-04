@@ -28,7 +28,10 @@ legacy caches containing this scope's index.html. Unrelated caches are preserved
 
 1. Finish changes to every shell file, including the template and manifest.
 2. Run `node tools/update-shell.cjs NEW_VERSION` with a unique, increasing version.
-   Never reuse a version for different content. This updates sw.js hashes only.
+   Never reuse a version for different content in a published release. The command
+   updates the canonical version in js/release.js, the Spanish HTML fallback label,
+   the Service Worker version and its hashes. JavaScript uses AppRelease.version
+   for the translated ES/EN/JA label. Do not maintain these derived versions by hand.
 3. Run `node --test tests/*.test.cjs`, syntax checks and `git diff --check`.
 4. Publish the complete directory, preferably as one atomic static deployment. If
    publishing file by file, publish sw.js last. Integrity prevents a partial shell

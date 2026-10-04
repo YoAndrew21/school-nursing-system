@@ -917,7 +917,7 @@
     renderValidation(getData());
     renderCircMeter.flush();
     renderSaveStatus();
-    $('#appVersion').textContent = tr('Versión {version}', { version: '1.3.2' });
+    $('#appVersion').textContent = tr('Versión {version}', { version: AppRelease.version });
     if (dialog.open && dialogContent) renderDialog();
     if (!$('#toast').hidden) renderToast();
   });
