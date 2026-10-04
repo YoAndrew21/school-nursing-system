@@ -1,0 +1,24 @@
+# Local deployment metadata
+.netlify/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local/private data exports
+private/
+data/private/
+*.local.xlsx
+*.local.csv
